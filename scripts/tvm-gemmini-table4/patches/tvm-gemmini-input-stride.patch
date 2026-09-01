@@ -1,0 +1,12 @@
+diff --git a/python/tvm/contrib/gemmini/intrin.py b/python/tvm/contrib/gemmini/intrin.py
+--- a/python/tvm/contrib/gemmini/intrin.py
++++ b/python/tvm/contrib/gemmini/intrin.py
+@@ -317,7 +317,7 @@ def gemm_intrin(inp_shape, wgt_shape, bias_shape, out_dtype, scale, matmul_type)
+                     dwgt.access_ptr("r"),
+                     dbias.access_ptr("r"),
+                     dout.access_ptr("w"),
+-                    dinp.shape[0],  # stride_A
++                    dinp.shape[1],  # stride_A
+                     dwgt.shape[1],  # stride_B
+                     dwgt.shape[1],  # stride_C
+                     dwgt.shape[1],  # stride_D

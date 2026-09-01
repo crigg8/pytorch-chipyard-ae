@@ -1,0 +1,53 @@
+# RUN: llc %s -o - -mtriple=riscv64 -mattr=+v \
+# RUN:   -run-pass=riscv-rvv-store-fence -simplify-mir \
+# RUN:   -verify-machineinstrs | FileCheck %s
+
+--- |
+  define void @store_base_reused() {
+    ret void
+  }
+
+  define void @existing_fence() {
+    ret void
+  }
+...
+---
+name: store_base_reused
+tracksRegLiveness: true
+liveins:
+  - { reg: '$x12' }
+  - { reg: '$v8' }
+body: |
+  bb.0:
+    liveins: $x12, $v8
+
+    ; Model the MobileNet descriptor-copy fault: the outstanding vse64 still
+    ; reads a2 after a younger scalar instruction has changed a2 to 0x7f.
+    ; CHECK-LABEL: name: store_base_reused
+    ; CHECK: PseudoVSE64_V_M1 $v8, $x12, 2, 6
+    ; CHECK-NEXT: FENCE 3, 3
+    ; CHECK-NEXT: $x12 = ADDI $x0, 127
+    PseudoVSE64_V_M1 $v8, $x12, 2, 6
+    $x12 = ADDI $x0, 127
+    PseudoRET
+...
+---
+name: existing_fence
+tracksRegLiveness: true
+liveins:
+  - { reg: '$x12' }
+  - { reg: '$v8' }
+body: |
+  bb.0:
+    liveins: $x12, $v8
+
+    ; CHECK-LABEL: name: existing_fence
+    ; CHECK: PseudoVSE64_V_M1 $v8, $x12, 2, 6
+    ; CHECK-NEXT: FENCE 3, 3
+    ; CHECK-NOT: FENCE
+    ; CHECK-NEXT: $x12 = ADDI $x0, 127
+    PseudoVSE64_V_M1 $v8, $x12, 2, 6
+    FENCE 3, 3
+    $x12 = ADDI $x0, 127
+    PseudoRET
+...

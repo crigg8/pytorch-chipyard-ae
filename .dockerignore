@@ -1,0 +1,94 @@
+.git
+**/.git
+.gitmodules
+
+# Local Python/build artifacts
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.cache/
+*.egg-info/
+
+# Heavy generated compiler/build outputs. The Docker image rebuilds these from
+# the checked-out source using scripts/install.sh.
+llvm-project/build/
+triton/build/
+buddy-mlir/build/
+
+# Buddy-MLIR carries a nested LLVM checkout, but this repository's install path
+# builds against the top-level llvm-project checkout instead.
+buddy-mlir/llvm/
+
+# The Stage 1 compiler build only enables LLVM, MLIR, and LLD. Exclude the
+# remaining monorepo projects before COPY so they never occupy a Docker layer.
+llvm-project/.ci/
+llvm-project/bolt/
+llvm-project/clang/
+llvm-project/clang-tools-extra/
+llvm-project/compiler-rt/
+llvm-project/cross-project-tests/
+llvm-project/flang/
+llvm-project/flang-rt/
+llvm-project/libc/
+llvm-project/libclc/
+llvm-project/libcxx/
+llvm-project/libcxxabi/
+llvm-project/libsycl/
+llvm-project/lldb/
+llvm-project/llvm-libgcc/
+llvm-project/offload/
+llvm-project/openmp/
+llvm-project/polly/
+llvm-project/runtimes/
+llvm-project/utils/
+
+# LLVM is configured without its tests, examples, docs, benchmarks, or
+# language bindings. MLIR's test tree is intentionally retained because
+# buddy-opt links MLIRTestTransforms and MLIRTestTransformDialect.
+llvm-project/llvm/benchmarks/
+llvm-project/llvm/bindings/
+llvm-project/llvm/docs/
+llvm-project/llvm/examples/
+llvm-project/llvm/test/
+llvm-project/llvm/unittests/
+llvm-project/lld/test/
+llvm-project/lld/unittests/
+llvm-project/lld/docs/*
+!llvm-project/lld/docs/CMakeLists.txt
+llvm-project/mlir/benchmark/
+llvm-project/mlir/docs/
+llvm-project/mlir/examples/
+llvm-project/mlir/python/
+llvm-project/mlir/unittests/
+
+# Buddy examples are disabled. Keep only the files read while configuring its
+# lit targets; the Stage 1 compiler uses the top-level artifact examples.
+buddy-mlir/examples/*
+!buddy-mlir/examples/CMakeLists.txt
+!buddy-mlir/examples/lit.cfg.py
+!buddy-mlir/examples/lit.site.cfg.py.in
+
+# Triton unit tests, Python tests, and tutorials are not built or packaged in
+# the Chipyard-only image. triton/test and triton/test/lib remain because the
+# unmodified Triton CMake project adds them unconditionally.
+triton/unittest/
+triton/python/test/
+triton/python/tutorials/
+
+# Local artifact/runtime outputs that should be mounted explicitly when needed.
+examples/artifact-*/
+examples/**/artifact-*/
+scripts/.logs/
+scripts/figures/results-workload/
+.firemarshal/
+.firesim-runtime/
+FIRESIM_RUNS_DIR/
+artifacts/
+
+# U250 bitstreams are consumed by the Stage 2 host workflow, not Stage 1.
+bitstreams/
+
+# Documentation build output is not part of the Stage 1 Docker image.
+docs/_build/

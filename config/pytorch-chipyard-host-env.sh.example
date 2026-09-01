@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Copy to ~/.pytorch-chipyard-host-env.sh. Edit only the paths marked REQUIRED;
+# the remaining paths are derived from the current user's home directory.
+
+umask 0002
+
+# REQUIRED: shared Chipyard installation.
+export CHIPYARD_DIR=/path/to/chipyard
+export CHIPYARD_ENV_PATH="$CHIPYARD_DIR/env.sh"
+
+# REQUIRED: account-private, initialized FireMarshal tree. FireMarshal writes
+# Linux/OpenSBI build state inside its source tree, so do not share this path
+# between concurrently running accounts.
+export FIREMARSHAL_DIR="$HOME/.local/share/pytorch-chipyard/chipyard/software/firemarshal"
+export FIREMARSHAL_CONFIG_PATH="$FIREMARSHAL_DIR/marshal-config.yaml"
+
+export FIRESIM_DIR="$CHIPYARD_DIR/sims/firesim"
+export FIRESIM_BUILD_RECIPES_PATH="$FIRESIM_DIR/deploy/config_build_recipes.yaml"
+
+# Keep this unset. The artifact runner creates a user-local HWDB from the U250
+# bitstreams bundled under ~/pytorch-chipyard/bitstreams.
+unset FIRESIM_HWDB_PATH
+
+# All writable FireSim and FireMarshal state is user-local and outside the
+# replaceable source checkout. These paths must be real directories, not links
+# back into ~/pytorch-chipyard. The Stage 2 scripts create them as needed.
+export PYTORCH_CHIPYARD_STATE_DIR=~/.local/share/pytorch-chipyard
+
+export FIRESIM_DEPLOY_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firesim/deploy"
+export FIRESIM_WORKLOAD_DIR="$FIRESIM_DEPLOY_DIR/workloads"
+export PYTORCH_CHIPYARD_RESULTS_WORKLOAD_DIR="$FIRESIM_DEPLOY_DIR/results-workload"
+export MARSHAL_FIRESIM_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firesim"
+
+export MARSHAL_IMAGE_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firemarshal/images"
+export FIREMARSHAL_IMAGE_DIR="$MARSHAL_IMAGE_DIR/firechip"
+export PYTORCH_CHIPYARD_WORKLOAD_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firemarshal/workloads"
+
+export FIRESIM_RUNS_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firesim-runs"
+export PYTORCH_CHIPYARD_FIRESIM_RUNTIME_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firesim-runtime"
+
+# Durable result logs must live in the artifact repository. scripts/env.sh
+# rejects a result path outside the current pytorch-chipyard checkout.
+export PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR=~/pytorch-chipyard/scripts/figures/results-workload
+export PYTORCH_CHIPYARD_LOG_DIR=~/pytorch-chipyard/examples/.logs
+
+export PYTORCH_CHIPYARD_FIREMARSHAL_TMP_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firemarshal/tmp"
+export MARSHAL_LOG_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firemarshal/logs"
+export MARSHAL_RES_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firemarshal/run-output"
+export MARSHAL_MOUNT_DIR="$PYTORCH_CHIPYARD_STATE_DIR/firemarshal/disk-mount"
+export LIBGUESTFS_CACHEDIR="$PYTORCH_CHIPYARD_STATE_DIR/firemarshal/libguestfs-cache"
+export LIBGUESTFS_TMPDIR="$PYTORCH_CHIPYARD_STATE_DIR/firemarshal/libguestfs-tmp"
+
+# REQUIRED: RISC-V Linux compiler used for model ELF construction.
+export PYTORCH_CHIPYARD_RISCV_TOOLCHAIN_DIR=/path/to/riscv-tools
+
+# REQUIRED: local U250 serial-number/BDF database. The bitstream HWDB is
+# generated automatically from ~/pytorch-chipyard/bitstreams.
+export PYTORCH_CHIPYARD_FPGA_DB=/path/to/firesim-db.json

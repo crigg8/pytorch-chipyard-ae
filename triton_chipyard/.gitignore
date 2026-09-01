@@ -1,0 +1,145 @@
+############################
+# General
+############################
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+############################
+# Git submodule / vendor
+############################
+**/.git
+**/.gitmodules
+**/.gitignore~
+
+############################
+# Build directories (CMake)
+############################
+build/
+build-*/
+cmake-build-*/
+out/
+dist/
+_install/
+install/
+*/build/
+*/build-*/
+
+############################
+# CMake generated files
+############################
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+CTestTestfile.cmake
+
+############################
+# Ninja
+############################
+.ninja_deps
+.ninja_log
+
+############################
+# LLVM / MLIR / Triton
+############################
+llvm-project/build/
+llvm-project/install/
+llvm-project/**/CMakeCache.txt
+llvm-project/**/CMakeFiles/
+
+triton/build/
+triton/**/CMakeCache.txt
+triton/**/CMakeFiles/
+
+############################
+# Chipyard / Verilog / FIRRTL
+############################
+generated-src/
+generated-src-*
+simulator/
+simulator-*
+obj_dir/
+*.fir
+*.anno.json
+*.vcd
+*.log
+
+############################
+# Python
+############################
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+dist/
+build/
+
+############################
+# Python virtual environments
+############################
+.venv/
+venv/
+env/
+conda/
+.conda/
+.micromamba/
+
+############################
+# Triton runtime / cache
+############################
+.triton/
+.cache/
+.cache/triton/
+.cache/torch/
+
+############################
+# PyTorch
+############################
+*.pt
+*.pth
+*.ckpt
+
+############################
+# Logs & profiling
+############################
+*.log
+*.out
+*.err
+*.trace
+*.vtune
+*.prof
+perf.data*
+nsys-rep
+nsys-report*
+
+############################
+# IDE / Editor
+############################
+.vscode/
+.idea/
+*.code-workspace
+
+############################
+# Codespaces / Devcontainer
+############################
+.devcontainer/
+.codespaces/
+
+############################
+# Temporary / Downloads
+############################
+tmp/
+temp/
+downloads/
+-IR/
++/IR/
+scripts/
+!scripts/
+!scripts/run-llm.sh

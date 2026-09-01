@@ -1,0 +1,132 @@
+# RUN: llc %s -o - -mtriple=riscv64 -mattr=+v -run-pass=riscv-rvv-base-hazard \
+# RUN:   -verify-machineinstrs -simplify-mir | FileCheck %s
+
+---
+name: nearest_later_candidate_only
+body: |
+  bb.0:
+    ; CHECK-LABEL: name: nearest_later_candidate_only
+    ; CHECK: %lhs:gpr = COPY $x10
+    ; CHECK-NEXT: %rhs:gpr = COPY $x11
+    ; CHECK-NEXT: %vecbase:gprjalr = ADD %lhs, %rhs
+    ; CHECK-NEXT: %vec:vrm2 = PseudoVLE32_V_M2 $noreg, %vecbase, -1, 5
+    ; CHECK-NEXT: %scalbase:gpr = ADD %lhs, %rhs
+    ; CHECK-NEXT: [[SCRATCH:%[0-9]+]]:gprx5 = ADDI %scalbase, 2047
+    ; CHECK-NEXT: %load0:gpr = LW killed [[SCRATCH]], 1
+    ; CHECK-NEXT: %shamt:gpr = ADDI $x0, 5
+    ; CHECK-NEXT: %shifted:gpr = SLLI killed %shamt, 10
+    ; CHECK-NEXT: %far:gpr = ADD %scalbase, killed %shifted
+    ; CHECK-NEXT: %load1:gpr = LW killed %far, -2048
+    %lhs:gpr = COPY $x10
+    %rhs:gpr = COPY $x11
+    %vecbase:gpr = ADD %lhs, %rhs
+    %vec:vrm2 = PseudoVLE32_V_M2 $noreg, killed %vecbase, -1, 5, 3
+    %scalbase:gpr = ADD %lhs, %rhs
+    %nearest:gpr = ADDI %scalbase, 2047
+    %load0:gpr = LW killed %nearest, 1
+    %shamt:gpr = ADDI $x0, 5
+    %shifted:gpr = SLLI killed %shamt, 10
+    %far:gpr = ADD %scalbase, killed %shifted
+    %load1:gpr = LW killed %far, -2048
+...
+---
+name: no_direct_scalar_mem_user
+body: |
+  bb.0:
+    ; CHECK-LABEL: name: no_direct_scalar_mem_user
+    ; CHECK: %lhs:gpr = COPY $x10
+    ; CHECK-NEXT: %rhs:gpr = COPY $x11
+    ; CHECK-NEXT: %vecbase:gpr = ADD %lhs, %rhs
+    ; CHECK-NEXT: %vec:vrm2 = PseudoVLE32_V_M2 $noreg, %vecbase, -1, 5
+    ; CHECK-NEXT: %addr:gpr = ADDI %lhs, 2047
+    ; CHECK-NEXT: %sum:gpr = ADD %addr, %rhs
+    %lhs:gpr = COPY $x10
+    %rhs:gpr = COPY $x11
+    %vecbase:gpr = ADD %lhs, %rhs
+    %vec:vrm2 = PseudoVLE32_V_M2 $noreg, killed %vecbase, -1, 5, 3
+    %addr:gpr = ADDI %lhs, 2047
+    %sum:gpr = ADD %addr, %rhs
+...
+---
+name: direct_rvv_memory_user
+body: |
+  bb.0:
+    ; CHECK-LABEL: name: direct_rvv_memory_user
+    ; CHECK: %lhs:gpr = COPY $x10
+    ; CHECK-NEXT: %rhs:gpr = COPY $x11
+    ; CHECK-NEXT: %vecbase0:gprjalr = ADD %lhs, %rhs
+    ; CHECK-NEXT: %vec0:vrm2 = PseudoVLE32_V_M2 $noreg, %vecbase0, -1, 5
+    ; CHECK-NEXT: [[SCRATCH:%[0-9]+]]:gprx5 = ADD %lhs, %rhs
+    ; CHECK-NEXT: %vec1:vrm2 = PseudoVLE32_V_M2 $noreg, killed [[SCRATCH]], -1, 5
+    %lhs:gpr = COPY $x10
+    %rhs:gpr = COPY $x11
+    %vecbase0:gpr = ADD %lhs, %rhs
+    %vec0:vrm2 = PseudoVLE32_V_M2 $noreg, killed %vecbase0, -1, 5, 3
+    %vecbase1:gpr = ADD %lhs, %rhs
+    %vec1:vrm2 = PseudoVLE32_V_M2 $noreg, killed %vecbase1, -1, 5, 3
+...
+---
+name: load_base_live_until_vector_consumer
+body: |
+  bb.0:
+    ; Model the descriptor-copy sequence emitted by the CNN workloads:
+    ;   ld a0, ...; vle64.v v8, (a0); mv a0, sp; ...; vse64.v v8, (...)
+    ; The base definition and the younger stack address are deliberately not
+    ; ADD/ADDI-only address chains handled by the original workaround.
+    ; CHECK-LABEL: name: load_base_live_until_vector_consumer
+    ; CHECK: %frame:gpr = COPY $x8
+    ; CHECK-NEXT: %vecbase:gpr = LD %frame, -128
+    ; CHECK-NEXT: %vec:vr = PseudoVLE64_V_M1 $noreg, %vecbase, $noreg, 6
+    ; CHECK-NEXT: PseudoBR %bb.1
+    ; CHECK: bb.1:
+    ; CHECK-NEXT: %stack:gpr = COPY $x2
+    ; CHECK-NEXT: %dst:gpr = ADDI %stack, -64
+    ; CHECK-NEXT: PseudoVSE64_V_M1 %vec, %dst, $noreg, 6 /* e64 */, implicit %vecbase
+    ; CHECK-NEXT: PseudoVSE64_V_M1 %vec, %stack, $noreg, 6 /* e64 */, implicit %vecbase
+    %frame:gpr = COPY $x8
+    %vecbase:gpr = LD %frame, -128
+    %vec:vr = PseudoVLE64_V_M1 $noreg, killed %vecbase, $noreg, 6, 0
+    PseudoBR %bb.1
+
+  bb.1:
+    %stack:gpr = COPY $x2
+    %dst:gpr = ADDI %stack, -64
+    PseudoVSE64_V_M1 %vec, %dst, $noreg, 6
+    PseudoVSE64_V_M1 %vec, %stack, $noreg, 6
+...
+---
+name: base_def_is_not_add
+body: |
+  bb.0:
+    ; CHECK-LABEL: name: base_def_is_not_add
+    ; CHECK: %vecbase:gpr = COPY $x10
+    ; CHECK-NEXT: %vec:vrm2 = PseudoVLE32_V_M2 $noreg, %vecbase, -1, 5
+    ; CHECK-NEXT: %addr:gpr = ADDI %vecbase, 2047
+    ; CHECK-NEXT: %load:gpr = LW killed %addr, 1
+    %vecbase:gpr = COPY $x10
+    %vec:vrm2 = PseudoVLE32_V_M2 $noreg, killed %vecbase, -1, 5, 3
+    %addr:gpr = ADDI %vecbase, 2047
+    %load:gpr = LW killed %addr, 1
+...
+---
+name: candidate_in_different_block
+body: |
+  bb.0:
+    ; CHECK-LABEL: name: candidate_in_different_block
+    ; CHECK: bb.0:
+    ; CHECK-NEXT: %lhs:gpr = COPY $x10
+    ; CHECK-NEXT: %rhs:gpr = COPY $x11
+    ; CHECK-NEXT: %vecbase:gpr = ADD %lhs, %rhs
+    ; CHECK-NEXT: %vec:vrm2 = PseudoVLE32_V_M2 $noreg, killed %vecbase, -1, 5
+    %lhs:gpr = COPY $x10
+    %rhs:gpr = COPY $x11
+    %vecbase:gpr = ADD %lhs, %rhs
+    %vec:vrm2 = PseudoVLE32_V_M2 $noreg, killed %vecbase, -1, 5, 3
+
+  bb.1:
+    ; CHECK: bb.1:
+    ; CHECK-NEXT: %addr:gpr = ADDI %lhs, 2047
+    ; CHECK-NEXT: %load:gpr = LW killed %addr, 1
+    %addr:gpr = ADDI %lhs, 2047
+    %load:gpr = LW killed %addr, 1
+...

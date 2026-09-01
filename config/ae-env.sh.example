@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Copy to ~/.ae-env.sh and edit the three setup-script paths.
+
+source /path/to/conda/etc/profile.d/conda.sh
+source /path/to/xrt/setup.sh >/dev/null
+source /path/to/Vivado/2021.1/settings64.sh
+
+source ~/.pytorch-chipyard-host-env.sh
+
+# Needed only for rootless Docker. Remove this line for a system-wide daemon.
+export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+export TABLE4_TVM_AE_ROOT=~/tvm-gemmini-ae
+export PYTORCH_CHIPYARD_ACCOUNT_ENV=~/.ae-env.sh
