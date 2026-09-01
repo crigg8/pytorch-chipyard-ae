@@ -361,7 +361,6 @@ def _ttsharedir_to_buddymlir(ttsharedir: str, metadata, options):
     assert len(matches) == 1, matches
     metadata["name"] = matches[0]
 
-    # inject metadatas to module attribute( initially, ttsharedir has no module attribute )
     metadata_str = (
         f'"ttc.gemmini_tile_i" = {metadata["gemmini_tile_i"]}, '
         f'"ttc.gemmini_tile_j" = {metadata["gemmini_tile_j"]}, '
@@ -514,8 +513,6 @@ class ChipyardOptions:
     allow_fp8e4nv: bool = False
     allowed_dot_input_precisions: Tuple[str] = ("ieee", )
     sanitize_overflow: bool = True
-    # Above options are dummy to fit with BaseBackend interface.
-    # Below are Chipyard specific options.
     addr_len: int = 32
     dim: int = 16
     bank_rows: int = 4096
@@ -623,8 +620,6 @@ class ChipyardBackend(BaseBackend):
             metadata.custom_linalg_library_sha256,
         )
 
-    # Our compilation pipeline isn't in python like nvidia or amd, no need to load
-    # dialects. See `triton_shared.cc`
     def load_dialects(self, ctx):
         return
 
@@ -658,6 +653,5 @@ class ChipyardBackend(BaseBackend):
     def hash(self):
         return self.target
 
-    # The CPU backend does not use any extra python modules, return an empty dictionary
     def get_module_map(self) -> Dict[str, ModuleType]:
         return {}
