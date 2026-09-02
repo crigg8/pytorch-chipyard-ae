@@ -38,10 +38,10 @@ Unpack the Zenodo archive in the home directory so that the artifact root is
 Because the Docker image build and Stage 2 simulations can take a long time, run them inside a `tmux` session so that they continue if the SSH connection is interrupted.
 
 ```bash
-# or Download it from Zenodo
+# Github Installation
 git clone --branch v1.0.0 --depth 1 \
   https://github.com/crigg8/pytorch-chipyard-ae.git \
-  pytorch-chipyard
+  pytorch-chipyard # (or download it from Zenodo)
 cd ~/pytorch-chipyard
 bash scripts/download-bitstreams.sh
 
