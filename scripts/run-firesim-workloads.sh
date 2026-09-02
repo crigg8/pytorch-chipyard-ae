@@ -640,11 +640,9 @@ prepare_firesim_hwdb() {
   fi
 
   require_dir "${PYTORCH_CHIPYARD_BITSTREAM_DIR}"
-  require_file "${PYTORCH_CHIPYARD_HWDB_TEMPLATE}"
   require_file "${generator}"
   mkdir -p "$(dirname -- "${PYTORCH_CHIPYARD_GENERATED_HWDB_PATH}")"
   "${FIRESIM_PYTHON}" "${generator}" \
-    --template "${PYTORCH_CHIPYARD_HWDB_TEMPLATE}" \
     --bitstream-dir "${PYTORCH_CHIPYARD_BITSTREAM_DIR}" \
     --output "${PYTORCH_CHIPYARD_GENERATED_HWDB_PATH}" || \
     die "failed to prepare the bundled FireSim HWDB"
@@ -1026,7 +1024,7 @@ collect_workload_result() {
   local workload="$1"
   local marker="${2:-}"
   local runtime="${3:-}"
-  local result_dir dest entry wall_marker validation_status=0
+  local result_dir dest entry wall_seconds validation_status=0
 
   result_dir="$(latest_result_dir "${workload}" "${marker}")"
   if [[ -z "${result_dir}" ]]; then
@@ -1044,9 +1042,17 @@ collect_workload_result() {
   cmp -s -- "${result_dir}/model.log" "${dest}/model.log" || return 1
   cmp -s -- "${result_dir}/autotune.log" "${dest}/autotune.log" || return 1
 
-  wall_marker="$(LC_ALL=C grep -aE '^TABLE4_FIRESIM_WALL_S=[0-9]+([.][0-9]+)?$' \
-    "${result_dir}/uartlog" | tail -n 1 || true)"
-  [[ -z "${wall_marker}" ]] || printf '%s\n' "${wall_marker}"
+  # FireSim emits the guest PASS marker and wallclock summary in uartlog, not
+  # in this runner's stdout. Canonicalize that validated UART result before
+  # cleanup so Table 4 can parse the wrapper log after uartlog is removed.
+  wall_seconds="$(
+    "${FIRESIM_PYTHON}" "${SCRIPT_DIR}/table4_results.py" \
+      extract-firesim-wall --log "${result_dir}/uartlog"
+  )" || {
+    warn "${workload}: failed to extract FireSim wallclock time from ${result_dir}/uartlog"
+    return 1
+  }
+  printf 'TABLE4_FIRESIM_WALL_S=%s\n' "${wall_seconds}"
 
   while IFS= read -r -d '' entry; do
     case "$(basename "${entry}")" in

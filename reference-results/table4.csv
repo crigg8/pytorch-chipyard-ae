@@ -1,0 +1,4 @@
+kernel_id,kernel,source_model,shape,macs,pytorch_compile_s,firesim_s,tvm_compile_s,verilator_s,pytorch_compile_trials,firesim_trials,tvm_compile_trials,verilator_trials,status
+squeezenet_fire2_squeeze,SqueezeNet fire2 squeeze,SqueezeNet 1.1,3025x16x64,3097600,23.300000,219.000000,3.600000,6047.100000,1,1,1,1,PASS
+resnet50_classifier,ResNet-50 classifier,ResNet-50,1x1000x2048,2048000,24.200000,224.500000,3.300000,21018.800000,1,1,1,1,PASS
+mobilenetv2_classifier,MobileNetV2 classifier,MobileNetV2,1x1000x1280,1280000,24.100000,222.500000,3.000000,13351.700000,1,1,1,1,PASS

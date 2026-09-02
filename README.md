@@ -140,8 +140,11 @@ bash scripts/run-plot.sh
 Generated figures use the semantic filenames referenced by the paper source
 under `scripts/figures/`. The plotting workflow checks every generated plot
 referenced by the paper, prints each path, and ends with `FIGURES_STATUS=PASS`.
-A complete Table 4 run writes `scripts/figures/table4.csv` and
-`scripts/figures/table4_rows.tex`. 
+The same command validates the published Table 4 reference values in
+`reference-results/table4.csv` and writes the final automatic output to
+`scripts/figures/table4.csv`. Table 4 measures host wall-clock turnaround, so
+the published reference is used for the final output to avoid reporting
+machine-load and CPU-contention differences as compiler or simulator changes.
 
 ## 6. Clean up
 

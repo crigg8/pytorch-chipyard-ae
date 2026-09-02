@@ -14,9 +14,30 @@ import table4_results
 
 
 KERNEL_ID = "resnet50_classifier"
+REFERENCE_TABLE4 = Path(__file__).resolve().parent.parent / "reference-results" / "table4.csv"
 
 
 class TestTable4Results(unittest.TestCase):
+    def test_published_table4_reference(self):
+        table4_results.validate_summary(REFERENCE_TABLE4, minimum_trials=1)
+        with REFERENCE_TABLE4.open(newline="") as csv_file:
+            rows = {row["kernel_id"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(
+            {
+                kernel_id: (
+                    row["pytorch_compile_s"], row["firesim_s"],
+                    row["tvm_compile_s"], row["verilator_s"],
+                )
+                for kernel_id, row in rows.items()
+            },
+            {
+                "squeezenet_fire2_squeeze": ("23.300000", "219.000000", "3.600000", "6047.100000"),
+                "resnet50_classifier": ("24.200000", "224.500000", "3.300000", "21018.800000"),
+                "mobilenetv2_classifier": ("24.100000", "222.500000", "3.000000", "13351.700000"),
+            },
+        )
+
     def test_builtin_kernels_use_mobilenetv2_classifier(self):
         kernels = table4_results.table4_kernels()
         self.assertEqual(

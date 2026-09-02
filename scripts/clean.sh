@@ -58,7 +58,8 @@ while IFS= read -r -d '' figure; do
   figures+=("${figure}")
 done < <(
   find "${FIGURE_DIR}" -mindepth 1 -maxdepth 1 -type f \
-    \( -name '*.pdf' -o -name '*.png' -o -name '*.svg' -o -name '*.eps' \) \
+    \( -name '*.pdf' -o -name '*.png' -o -name '*.svg' -o -name '*.eps' -o \
+       -name 'table4.csv' \) \
     -size +0c -print0 | sort -z
 )
 

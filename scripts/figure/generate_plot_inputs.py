@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import re
 import shutil
@@ -15,6 +16,9 @@ WORKSPACE_DIR = ROOT_DIR.parent
 DEFAULT_RESULTS_DIR = ROOT_DIR / "figures" / "results-workload"
 CSV_DIR = ROOT_DIR / ".csv"
 LOG_DIR = Path(os.environ.get("PYTORCH_CHIPYARD_LOG_DIR", WORKSPACE_DIR / "examples" / ".logs"))
+ARTIFACT_ROOT = Path(
+    os.environ.get("PYTORCH_CHIPYARD_ARTIFACT_ROOT", WORKSPACE_DIR / "examples")
+)
 GENERATED_CSVS = [
     "cnn_result.csv",
     "alias_first_ablation.csv",
@@ -68,6 +72,13 @@ class WorkloadRun:
     @property
     def is_cnn(self) -> bool:
         return self.model in CNN_MODEL_ALIASES
+
+
+@dataclass(frozen=True)
+class Im2colLaunch:
+    raw: str
+    constant_shapes: tuple[tuple[int, ...], ...]
+    has_graph_input: bool
 
 
 def log(message: str) -> None:
@@ -624,13 +635,101 @@ def parse_execution_kernel_rows(path: Path) -> list[tuple[str, int]]:
     return rows
 
 
-def im2col_label(model: str, kernel: str, metadata: dict[str, int | str] | None) -> str:
+def im2col_model_spec_path(run: WorkloadRun) -> Path | None:
+    artifact_names = (
+        ("resnet50", "resnet")
+        if run.model in {"resnet", "resnet50"}
+        else ("squeezenet",)
+    )
+    variant = "gemmini-im2col" if "im2col" in run.tags else "gemmini"
+    candidates = [
+        path
+        for artifact_name in artifact_names
+        for path in (
+            ARTIFACT_ROOT
+            / f"artifact-{artifact_name}"
+            / variant
+            / "model_spec.json",
+            ARTIFACT_ROOT / artifact_name / variant / "model_spec.json",
+            WORKSPACE_DIR
+            / "triton_chipyard"
+            / "IR"
+            / f"{artifact_name}-{variant}"
+            / "model_spec.json",
+        )
+    ]
+    return next((path for path in candidates if path.is_file()), None)
+
+
+def load_im2col_launches(path: Path) -> list[Im2colLaunch]:
+    model_spec = json.loads(path.read_text())
+    buffers = {item["name"]: item for item in model_spec["buffers"]}
+    launches: list[Im2colLaunch] = []
+    for step in model_spec["steps"]:
+        if step.get("kind") != "launch":
+            continue
+        constant_shapes: list[tuple[int, ...]] = []
+        has_graph_input = False
+        for arg in step.get("call_args", []):
+            kind = arg.get("kind")
+            if kind == "graph_input":
+                has_graph_input = True
+            if kind != "constant":
+                continue
+            shape = buffers.get(arg.get("name", ""), {}).get("size_hint")
+            if shape:
+                constant_shapes.append(tuple(int(value) for value in shape))
+        launches.append(
+            Im2colLaunch(
+                raw=str(
+                    step.get("triton_meta", {}).get(
+                        "chipyard_default_kernel_name", ""
+                    )
+                    or ""
+                ),
+                constant_shapes=tuple(constant_shapes),
+                has_graph_input=has_graph_input,
+            )
+        )
+    return launches
+
+
+def convolution_weight_shape(launch: Im2colLaunch | None) -> tuple[int, ...] | None:
+    if launch is None:
+        return None
+    shapes = [
+        shape
+        for shape in launch.constant_shapes
+        if len(shape) == 4 and shape[-2] == shape[-1]
+    ]
+    return max(shapes, key=lambda shape: shape[-1], default=None)
+
+
+def im2col_label(
+    model: str,
+    kernel: str,
+    metadata: dict[str, int | str] | None,
+    launch: Im2colLaunch | None = None,
+) -> str:
     raw = str(metadata.get("raw", "")) if metadata else ""
+    if not raw and launch is not None:
+        raw = launch.raw
     kh = int(metadata.get("kernel_h", 0)) if metadata else 0
     sh = int(metadata.get("stride_h", 0)) if metadata else 0
     ph = int(metadata.get("padding_h", 0)) if metadata else 0
+    weight_shape = convolution_weight_shape(launch)
+    if kh == 0 and weight_shape is not None:
+        kh = weight_shape[-1]
 
     if "prepack" in kernel or "prepack" in raw:
+        return "prepack"
+    if (
+        not raw
+        and "convolution" in kernel
+        and launch is not None
+        and launch.constant_shapes
+        and (model == "ResNet50" or weight_shape is not None)
+    ):
         return "prepack"
     if "convolution" not in raw and "convolution" not in kernel and "mm" not in raw:
         return "others"
@@ -642,7 +741,7 @@ def im2col_label(model: str, kernel: str, metadata: dict[str, int | str] | None)
         if kh == 1:
             return "1x1 conv"
     if model == "SqueezeNet":
-        if kh == 3 and sh == 2 and ph == 0:
+        if kh == 3 and ((sh == 2 and ph == 0) or (launch and launch.has_graph_input)):
             return "3x3 s2p0"
         if kh == 3:
             return "Fire 3x3"
@@ -655,11 +754,28 @@ def cycles_by_im2col_label(run: WorkloadRun, labels: list[str]) -> dict[str, flo
     totals = {label: 0.0 for label in labels}
     metadata = parse_autotune_kernel_metadata(run.autotune_log)
     model_label = "ResNet50" if run.model in {"resnet", "resnet50"} else "SqueezeNet"
-    for kernel, total_cycles in parse_execution_kernel_rows(run.model_log):
-        label = im2col_label(model_label, kernel, metadata.get(kernel))
+    kernel_rows = parse_execution_kernel_rows(run.model_log)
+    spec_path = im2col_model_spec_path(run)
+    launches = load_im2col_launches(spec_path) if spec_path else []
+    if spec_path is None:
+        warn(f"model_spec.json not found for {run.workload}; using log metadata only")
+    elif len(launches) != len(kernel_rows):
+        warn(
+            f"launch count mismatch for {run.workload}: "
+            f"model_spec={len(launches)}, model.log={len(kernel_rows)}"
+        )
+
+    for index, (kernel, total_cycles) in enumerate(kernel_rows):
+        launch = launches[index] if index < len(launches) else None
+        label = im2col_label(model_label, kernel, metadata.get(kernel), launch)
         if label not in totals:
             label = "others"
         totals[label] += total_cycles / run.samples / 1e6
+
+    logged_total = sum(totals.values())
+    avg_mcycles = run.avg_cycles / 1e6
+    if avg_mcycles > logged_total:
+        totals["others"] += avg_mcycles - logged_total
     return totals
 
 

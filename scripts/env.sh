@@ -2,7 +2,6 @@
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
 export WORKSPACE="$(cd -- "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd -P)"
 export PYTORCH_CHIPYARD_BITSTREAM_DIR="${PYTORCH_CHIPYARD_BITSTREAM_DIR:-$WORKSPACE/bitstreams}"
-export PYTORCH_CHIPYARD_HWDB_TEMPLATE="${PYTORCH_CHIPYARD_HWDB_TEMPLATE:-$PYTORCH_CHIPYARD_BITSTREAM_DIR/config_hwdb.yaml.in}"
 export BUDDY_BINARY_DIR="$WORKSPACE/buddy-mlir/build/bin"
 export TRITON_CHIPYARD_OPT_PATH="$WORKSPACE/triton/build/cmake.linux-x86_64-cpython-3.12/third_party/triton_chipyard/tools/triton-chipyard-opt/triton-chipyard-opt"
 export LLVM_PROJECT_PATH="$WORKSPACE/llvm-project"

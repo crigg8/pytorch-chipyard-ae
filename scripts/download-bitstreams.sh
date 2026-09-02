@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd -P)"
-BITSTREAM_URL="https://github.com/crigg8/pytorch-chipyard-ae/releases/download/v1.0.0/bitstreams.zip"
+BITSTREAM_URL="${PYTORCH_CHIPYARD_BITSTREAM_URL:-https://github.com/crigg8/pytorch-chipyard-ae/releases/download/v1.0.0/bitstreams.zip}"
 DESTINATION="${REPO_ROOT}/bitstreams"
 
 die() {
@@ -65,10 +65,16 @@ fi
 
 bundle_count=0
 while IFS= read -r -d '' bundle_dir; do
-  [[ -s "${bundle_dir}/driver-bundle.tar.gz" ]] || \
+  [[ -f "${bundle_dir}/driver-bundle.tar.gz" && \
+     -s "${bundle_dir}/driver-bundle.tar.gz" ]] || \
     die "missing driver-bundle.tar.gz under ${bundle_dir}"
-  [[ -s "${bundle_dir}/firesim.tar.gz" ]] || \
+  [[ -f "${bundle_dir}/firesim.tar.gz" && \
+     -s "${bundle_dir}/firesim.tar.gz" ]] || \
     die "missing firesim.tar.gz under ${bundle_dir}"
+  unexpected="$(find "${bundle_dir}" -mindepth 1 -maxdepth 1 \
+    ! -name driver-bundle.tar.gz ! -name firesim.tar.gz -print -quit)"
+  [[ -z "${unexpected}" ]] || \
+    die "unexpected entry in bitstream bundle: ${unexpected}"
   bundle_count=$((bundle_count + 1))
 done < <(find "${extracted}" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
 [[ "${bundle_count}" -gt 0 ]] || die "no bitstream bundles were found in the ZIP"
@@ -79,4 +85,3 @@ unexpected="$(find "${extracted}" -mindepth 1 -maxdepth 1 ! -type d -print -quit
 mv -- "${extracted}" "${DESTINATION}"
 printf '[download-bitstreams] installed %s bundle(s) under %s\n' \
   "${bundle_count}" "${DESTINATION}"
-

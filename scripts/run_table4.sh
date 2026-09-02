@@ -45,8 +45,8 @@ Outputs:
 Compiler/simulator logs, compiler artifacts, FireMarshal images, and other
 runtime state are transient and removed after an RTL run.
 
-Only a complete successful matrix is copied to scripts/figures/table4.csv and
-scripts/figures/table4_rows.tex. Simulator construction, ELF construction,
+Only a complete successful matrix is copied to scripts/figures/table4.csv.
+Simulator construction, ELF construction,
 FireMarshal image construction, and FireSim setup are deliberately untimed.
 
 Environment:
@@ -608,11 +608,9 @@ if [[ "${complete_matrix}" -eq 1 ]]; then
     die "Table 4 CSV completeness validation failed"
   [[ -s "${latex_rows}" ]] || die "Table 4 LaTeX rows are missing or empty: ${latex_rows}"
   cp -f "${summary_csv}" "${SCRIPT_DIR}/figures/table4.csv"
-  cp -f "${latex_rows}" "${SCRIPT_DIR}/figures/table4_rows.tex"
   pass "Table 4 CSV=${summary_csv}"
   pass "Table 4 LaTeX rows=${latex_rows}"
   pass "Stable Table 4 CSV=${SCRIPT_DIR}/figures/table4.csv"
-  pass "Stable Table 4 LaTeX rows=${SCRIPT_DIR}/figures/table4_rows.tex"
 fi
 
 log "raw results: ${raw_csv}"

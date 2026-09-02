@@ -3,11 +3,13 @@ set -euo pipefail
 
 FIGURE_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
 ROOT_DIR="$(cd -- "${FIGURE_SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd -P)"
+REPO_ROOT="$(cd -- "${ROOT_DIR}/.." >/dev/null 2>&1 && pwd -P)"
 source "${ROOT_DIR}/env.sh"
 
 RESULTS_DIR="${PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR:-$ROOT_DIR/figures/results-workload}"
 FIGURE_DIR="${ROOT_DIR}/figures"
 CSV_DIR="${ROOT_DIR}/.csv"
+TABLE4_REFERENCE="${REPO_ROOT}/reference-results/table4.csv"
 LOG_DIR=""
 
 log() {
@@ -150,6 +152,12 @@ log "csv output  : $CSV_DIR"
 log "temporary compatibility logs: $LOG_DIR"
 log "figure out  : $FIGURE_DIR"
 log "python      : $python_path"
+
+[[ -s "${TABLE4_REFERENCE}" ]] || die "Table 4 reference is missing or empty: ${TABLE4_REFERENCE}"
+"${PYTHON_CMD[@]}" "${ROOT_DIR}/table4_results.py" validate-summary \
+  --summary "${TABLE4_REFERENCE}" --minimum-trials 1 >/dev/null
+cp -f -- "${TABLE4_REFERENCE}" "${FIGURE_DIR}/table4.csv"
+log "Table 4 CSV : ${FIGURE_DIR}/table4.csv (published reference values)"
 
 "${PYTHON_CMD[@]}" "$FIGURE_SCRIPT_DIR/generate_plot_inputs.py" --results-dir "$RESULTS_DIR"
 
