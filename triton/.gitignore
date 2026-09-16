@@ -26,9 +26,6 @@ python/triton/backends/*
 !python/triton/backends/compiler.py
 !python/triton/backends/driver.py
 
-# Language extras
-python/triton/language/extra
-
 # Tools extras
 python/triton/tools/extra
 
