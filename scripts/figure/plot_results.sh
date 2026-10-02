@@ -265,3 +265,7 @@ elif [[ "${skipped_count}" -gt 0 ]]; then
 else
   printf 'PLOT_RESULTS_STATUS=PASS\n'
 fi
+
+if [[ "${simple_stage2}" -eq 1 && "${skipped_count}" -gt 0 ]]; then
+  die "simple Stage 2 is missing ${skipped_count} required figure(s); retain the Stage 1 model_spec.json files under examples/ and check the input logs"
+fi
