@@ -1,0 +1,9 @@
+# Relative destination, public repository, pinned commit, optional archive SHA-256
+sims/firesim https://github.com/firesim/firesim.git 141bff735c9b81a6d82a593310d0ca8be903e9a1
+software/firemarshal https://github.com/firesim/FireMarshal.git 21119e5ce922ff9302f0bc9d2d7349c77f7ac064
+software/firemarshal/boards/default/linux https://github.com/firesim/linux.git 67bc4513761f09952a5d5f5c899630ed91ce6442 19eb95e79a7c255c9e323ab8c86f65c86d12126e624a7b781c6e1c673caf11a1
+software/firemarshal/boards/default/firmware/opensbi https://github.com/riscv/opensbi.git 5ccebf0a7ec79d0bbef36d6dcdc2717f25d40767
+software/firemarshal/boards/default/distros/br/buildroot https://github.com/buildroot/buildroot.git 2555f47788964d796c8a49e81ce1f5d63b9cb9ac
+software/firemarshal/wlutil/busybox https://github.com/mirror/busybox.git 70f77e4617e06077231b8b63c3fb3406d7f8865d
+software/firemarshal/boards/firechip/drivers/icenet-driver https://github.com/firesim/icenet-driver.git 72022daf314ad45391e3b6398418c072091b51d1
+software/firemarshal/boards/firechip/drivers/iceblk-driver https://github.com/firesim/iceblk-driver.git e2b1d25aef89601d52a70784401796a1d2845721

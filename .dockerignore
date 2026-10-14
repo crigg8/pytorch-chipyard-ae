@@ -87,7 +87,7 @@ scripts/figures/results-workload/
 FIRESIM_RUNS_DIR/
 artifacts/
 
-# U250 bitstreams are consumed by the Stage 2 host workflow, not Stage 1.
+# Stage 2 includes these through docker/stage2.Dockerfile.dockerignore.
 bitstreams/
 
 # Documentation build output is not part of the Stage 1 Docker image.

@@ -1,0 +1,426 @@
+diff --git a/deploy/buildtools/bitbuilder.py b/deploy/buildtools/bitbuilder.py
+index bd8d1da17..7b8ad184e 100644
+--- a/deploy/buildtools/bitbuilder.py
++++ b/deploy/buildtools/bitbuilder.py
+@@ -34,8 +34,9 @@ if TYPE_CHECKING:
+ rootLogger = logging.getLogger()
+ 
+ 
++#jseo: The current directory is mutable deploy state; code assets stay shared.
+ def get_deploy_dir() -> str:
+-    """Determine where the firesim/deploy directory is and return its path.
++    """Return the mutable FireSim manager deploy directory.
+ 
+     Returns:
+         Path to firesim/deploy directory.
+@@ -44,6 +45,17 @@ def get_deploy_dir() -> str:
+     return deploydir
+ 
+ 
++def get_firesim_install_deploy_dir() -> str:
++    """Return the deploy directory belonging to the FireSim installation.
++
++    This differs from get_deploy_dir() when FIRESIM_DEPLOY_DIR selects a
++    per-user manager workspace.  Source, platform collateral, drivers, and
++    privileged helper reference files continue to come from the shared
++    installation.
++    """
++    return os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
++
++
+ class BitBuilder(metaclass=abc.ABCMeta):
+     """Abstract class to manage how to build a bitstream for a build config.
+ 
+@@ -75,7 +87,8 @@ class BitBuilder(metaclass=abc.ABCMeta):
+             f"Building Verilog for {self.build_config.get_chisel_quintuplet()}"
+         )
+ 
+-        deploy_dir = get_deploy_dir()
++        #jseo: Build source and makefrags come from the shared installation.
++        deploy_dir = get_firesim_install_deploy_dir()
+         with InfoStreamLogger("stdout"), prefix(f"cd {deploy_dir}/../"), prefix(
+             create_export_string({"RISCV", "PATH", "LD_LIBRARY_PATH"})
+         ), prefix("source sourceme-manager.sh --skip-ssh-setup"), InfoStreamLogger(
+@@ -91,7 +104,8 @@ class BitBuilder(metaclass=abc.ABCMeta):
+             f"Building FPGA driver for {self.build_config.get_chisel_quintuplet()}"
+         )
+ 
+-        deploy_dir = get_deploy_dir()
++        #jseo: Build source and makefrags come from the shared installation.
++        deploy_dir = get_firesim_install_deploy_dir()
+         with InfoStreamLogger("stdout"), prefix(f"cd {deploy_dir}/../"), prefix(
+             create_export_string({"RISCV", "PATH", "LD_LIBRARY_PATH"})
+         ), prefix("source sourceme-manager.sh --skip-ssh-setup"), prefix("cd sim/"):
+@@ -212,8 +226,8 @@ class F1BitBuilder(BitBuilder):
+         """
+         fpga_build_postfix = f"hdk/cl/developer_designs/cl_{chisel_quintuplet}"
+ 
+-        # local paths
+-        local_awsfpga_dir = f"{get_deploy_dir()}/../platforms/f1/aws-fpga"
++        #jseo: Platform collateral comes from the shared installation.
++        local_awsfpga_dir = f"{get_firesim_install_deploy_dir()}/../platforms/f1/aws-fpga"
+ 
+         dest_f1_platform_dir = f"{dest_build_dir}/platforms/f1/"
+         dest_awsfpga_dir = f"{dest_f1_platform_dir}/aws-fpga"
+@@ -299,7 +313,7 @@ class F1BitBuilder(BitBuilder):
+ 
+         # copy script to the cl_dir and execute
+         rsync_cap = rsync_project(
+-            local_dir=f"{local_deploy_dir}/../platforms/f1/build-bitstream.sh",
++            local_dir=f"{get_firesim_install_deploy_dir()}/../platforms/f1/build-bitstream.sh",
+             remote_dir=f"{cl_dir}/",
+             ssh_opts="-o StrictHostKeyChecking=no",
+             extra_opts="-l",
+@@ -498,8 +512,8 @@ class VitisBitBuilder(BitBuilder):
+         """
+         fpga_build_postfix = f"cl_{chisel_quintuplet}"
+ 
+-        # local paths
+-        local_vitis_dir = f"{get_deploy_dir()}/../platforms/vitis"
++        #jseo: Platform collateral comes from the shared installation.
++        local_vitis_dir = f"{get_firesim_install_deploy_dir()}/../platforms/vitis"
+ 
+         dest_vitis_dir = "{}/platforms/vitis".format(dest_build_dir)
+ 
+@@ -580,7 +594,7 @@ class VitisBitBuilder(BitBuilder):
+         vitis_rc = 0
+         # copy script to the cl_dir and execute
+         rsync_cap = rsync_project(
+-            local_dir=f"{local_deploy_dir}/../platforms/vitis/build-bitstream.sh",
++            local_dir=f"{get_firesim_install_deploy_dir()}/../platforms/vitis/build-bitstream.sh",
+             remote_dir=f"{cl_dir}/",
+             ssh_opts="-o StrictHostKeyChecking=no",
+             extra_opts="-l",
+@@ -704,9 +718,9 @@ class XilinxAlveoBitBuilder(BitBuilder):
+         """
+         fpga_build_postfix = f"cl_{chisel_quintuplet}"
+ 
+-        # local paths
++        #jseo: Platform collateral comes from the shared installation.
+         local_alveo_dir = (
+-            f"{get_deploy_dir()}/../platforms/{self.build_config.PLATFORM}"
++            f"{get_firesim_install_deploy_dir()}/../platforms/{self.build_config.PLATFORM}"
+         )
+ 
+         dest_alveo_dir = f"{dest_build_dir}/platforms/{self.build_config.PLATFORM}"
+@@ -792,7 +806,7 @@ class XilinxAlveoBitBuilder(BitBuilder):
+         alveo_rc = 0
+         # copy script to the cl_dir and execute
+         rsync_cap = rsync_project(
+-            local_dir=f"{local_deploy_dir}/../platforms/{self.build_config.PLATFORM}/build-bitstream.sh",
++            local_dir=f"{get_firesim_install_deploy_dir()}/../platforms/{self.build_config.PLATFORM}/build-bitstream.sh",
+             remote_dir=f"{cl_dir}/",
+             ssh_opts="-o StrictHostKeyChecking=no",
+             extra_opts="-L",
+@@ -933,8 +947,8 @@ class XilinxVCU118BitBuilder(XilinxAlveoBitBuilder):
+         """
+         fpga_build_postfix = f"cl_{chisel_quintuplet}"
+ 
+-        # local paths
+-        local_alveo_dir = f"{get_deploy_dir()}/../platforms/{self.build_config.PLATFORM}/garnet-firesim"
++        #jseo: Platform collateral comes from the shared installation.
++        local_alveo_dir = f"{get_firesim_install_deploy_dir()}/../platforms/{self.build_config.PLATFORM}/garnet-firesim"
+ 
+         dest_alveo_dir = (
+             f"{dest_build_dir}/platforms/{self.build_config.PLATFORM}/garnet-firesim"
+@@ -991,8 +1005,8 @@ class RHSResearchNitefuryIIBitBuilder(XilinxAlveoBitBuilder):
+         """
+         fpga_build_postfix = f"Sample-Projects/Project-0/cl_{chisel_quintuplet}"
+ 
+-        # local paths
+-        local_alveo_dir = f"{get_deploy_dir()}/../platforms/{self.build_config.PLATFORM}/NiteFury-and-LiteFury-firesim"
++        #jseo: Platform collateral comes from the shared installation.
++        local_alveo_dir = f"{get_firesim_install_deploy_dir()}/../platforms/{self.build_config.PLATFORM}/NiteFury-and-LiteFury-firesim"
+ 
+         dest_alveo_dir = f"{dest_build_dir}/platforms/{self.build_config.PLATFORM}/NiteFury-and-LiteFury-firesim"
+ 
+diff --git a/deploy/firesim b/deploy/firesim
+index 69c3bf058..ff25ca102 100755
+--- a/deploy/firesim
++++ b/deploy/firesim
+@@ -403,10 +403,10 @@ def construct_firesim_argparser() -> argparse.ArgumentParser:
+                         default='config_build.yaml')
+     parser.add_argument('-r', '--buildrecipesconfigfile', type=str,
+                         help='Optional custom build recipe config file. Defaults to config_build_recipes.yaml.',
+-                        default='config_build_recipes.yaml')
++                        default=os.environ.get('FIRESIM_BUILD_RECIPES_PATH', 'config_build_recipes.yaml'))
+     parser.add_argument('-a', '--hwdbconfigfile', type=str,
+                         help='Optional custom HW database config file. Defaults to config_hwdb.yaml.',
+-                        default='config_hwdb.yaml')
++                        default=os.environ.get('FIRESIM_HWDB_PATH', 'config_hwdb.yaml'))
+     parser.add_argument('-x', '--overrideconfigdata', type=str,
+                         help='Override a single value from one of the the RUNTIME e.g.: --overrideconfigdata "target-config link-latency 6405".',
+                         default="")
+@@ -472,11 +472,28 @@ def main(args: argparse.Namespace) -> None:
+ 
+ 
+ if __name__ == '__main__':
+-    # set the program working dir to wherever firesim is located
+-    # this lets you run firesim from anywhere, not necessarily firesim/deploy/
+-    abspath = os.path.abspath(__file__)
+-    dname = os.path.dirname(abspath)
+-    os.chdir(dname)
++    #jseo: Separate mutable per-user manager state from the shared installation.
++    # Keep the FireSim installation (Python modules, platform collateral, and
++    # bitstreams) shareable while allowing each user to keep mutable manager
++    # state in a private deploy directory.  The legacy behavior is preserved
++    # when FIRESIM_DEPLOY_DIR is unset.
++    install_deploy_dir = Path(__file__).resolve().parent
++    configured_deploy_dir = os.environ.get("FIRESIM_DEPLOY_DIR")
++    manager_deploy_dir = Path(
++        os.path.expandvars(configured_deploy_dir)
++    ).expanduser().resolve() if configured_deploy_dir else install_deploy_dir
++
++    manager_deploy_dir.mkdir(parents=True, exist_ok=True)
++    for mutable_dir in (
++        "built-hwdb-entries",
++        "generated-topology-diagrams",
++        "logs",
++        "results-build",
++        "results-workload",
++        "workloads",
++    ):
++        (manager_deploy_dir / mutable_dir).mkdir(exist_ok=True)
++    os.chdir(manager_deploy_dir)
+ 
+     # parse args BEFORE setting up logs, otherwise argcomplete will cause
+     # junk log files to be created. also lets us use args.task in the logfile
+@@ -533,5 +550,9 @@ if __name__ == '__main__':
+             rootLogger.exception("Fatal error.")
+             exitcode = 1
+         finally:
+-            rootLogger.info("""The full log of this run is:\n{basedir}/{fulllog}""".format(basedir=dname, fulllog=full_log_filename))
++            rootLogger.info(
++                """The full log of this run is:\n{fulllog}""".format(
++                    fulllog=manager_deploy_dir / full_log_filename
++                )
++            )
+             sys.exit(exitcode)
+diff --git a/deploy/runtools/firesim_topology_with_passes.py b/deploy/runtools/firesim_topology_with_passes.py
+index 8f6e333f6..b0e5eff67 100644
+--- a/deploy/runtools/firesim_topology_with_passes.py
++++ b/deploy/runtools/firesim_topology_with_passes.py
+@@ -32,6 +32,7 @@ from runtools.simulation_data_classes import (
+ )
+ 
+ from runtools.run_farm_deploy_managers import InstanceDeployManager
++from buildtools.bitbuilder import get_firesim_install_deploy_dir
+ from typing import Dict, Any, cast, List, Set, TYPE_CHECKING, Callable, Optional
+ 
+ if TYPE_CHECKING:
+@@ -806,7 +807,12 @@ class FireSimTopologyWithPasses:
+         rootLogger.info(
+             """neighbor platform: {} quintuplet: {}""".format(platform, quintuplet)
+         )
+-        driver_path = os.path.join("../sim/generated-src", platform, quintuplet)
++        driver_path = os.path.join(
++            get_firesim_install_deploy_dir(),
++            "../sim/generated-src",
++            platform,
++            quintuplet,
++        )
+         p2p_config_file = os.path.join(
+             driver_path, "FireSim-generated.peer2peer.const.yaml"
+         )
+diff --git a/deploy/runtools/pipe_model_config.py b/deploy/runtools/pipe_model_config.py
+index 8916b09ff..4a9a6ca0f 100644
+--- a/deploy/runtools/pipe_model_config.py
++++ b/deploy/runtools/pipe_model_config.py
+@@ -73,14 +73,8 @@ class AbstractPipeToPipeConfig:
+         self.server_boundary_widths = []
+         self.server_cutbridge_idx_map = {}
+ 
+-    # FIXME: get_local_driver_dir returns ../output in f1 while it returns ../sim/generated-src in local metasims
+-    # Just set it to user ../sim/generated-src for now
+     def partition_config_file(self, hwconfig: RuntimeHWConfig) -> str:
+-        runtime_conf_path = os.path.join(
+-            "../sim/generated-src",
+-            hwconfig.get_platform(),
+-            hwconfig.get_deployquintuplet_for_config(),
+-        )
++        runtime_conf_path = hwconfig.get_local_driver_dir()
+         rootLogger.info(f"runtime_conf_path {runtime_conf_path}")
+         return os.path.join(runtime_conf_path, GENERATED_PARTITION_PARAMS_FILE)
+ 
+diff --git a/deploy/runtools/run_farm_deploy_managers.py b/deploy/runtools/run_farm_deploy_managers.py
+index efe380577..685f1a3ea 100644
+--- a/deploy/runtools/run_farm_deploy_managers.py
++++ b/deploy/runtools/run_farm_deploy_managers.py
+@@ -15,7 +15,8 @@ from pathlib import Path
+ from util.streamlogger import StreamLogger
+ from awstools.awstools import terminate_instances, get_instance_ids_for_instances
+ from runtools.utils import has_sudo, run_only_aws, check_script, is_on_aws, script_path
+-from buildtools.bitbuilder import get_deploy_dir
++#jseo: Privileged helper references come from the shared FireSim installation.
++from buildtools.bitbuilder import get_firesim_install_deploy_dir
+ 
+ from typing import List, Dict, Optional, Union, Tuple, TYPE_CHECKING
+ 
+@@ -684,7 +685,8 @@ class EC2InstanceDeployManager(InstanceDeployManager):
+     def get_and_install_aws_fpga_sdk(self) -> None:
+         """Installs the aws-sdk. This gets us access to tools to flash the fpga."""
+         if self.instance_assigned_simulations():
+-            with prefix("cd ../"):
++            firesim_install_dir = Path(get_firesim_install_deploy_dir()).parent
++            with prefix(f"cd {firesim_install_dir}"):
+                 # use local version of aws_fpga on run farm nodes
+                 aws_fpga_upstream_version = local(
+                     "git -C platforms/f1/aws-fpga describe --tags --always --dirty",
+@@ -713,7 +715,7 @@ class EC2InstanceDeployManager(InstanceDeployManager):
+             self.instance_logger("""Copying AWS FPGA XDMA driver to remote node.""")
+             run(f"mkdir -p /home/{os.environ['USER']}/xdma/")
+             put(
+-                "../platforms/f1/aws-fpga/sdk/linux_kernel_drivers",
++                f"{get_firesim_install_deploy_dir()}/../platforms/f1/aws-fpga/sdk/linux_kernel_drivers",
+                 f"/home/{os.environ['USER']}/xdma/",
+                 mirror_local_mode=True,
+             )
+@@ -1112,7 +1114,7 @@ class XilinxAlveoInstanceDeployManager(InstanceDeployManager):
+ 
+                 self.instance_logger(f"""Copying FPGA flashing scripts for {slotno}""")
+                 rsync_cap = rsync_project(
+-                    local_dir=f"../platforms/{self.PLATFORM_NAME}/scripts",
++                    local_dir=f"{get_firesim_install_deploy_dir()}/../platforms/{self.PLATFORM_NAME}/scripts",
+                     remote_dir=remote_sim_dir,
+                     ssh_opts="-o StrictHostKeyChecking=no",
+                     extra_opts="-L -p",
+@@ -1129,10 +1131,11 @@ class XilinxAlveoInstanceDeployManager(InstanceDeployManager):
+                 )
+                 # Use a system wide installed firesim-fpga-util.py
+                 cmd = f"{script_path}/firesim-fpga-util.py"
++                #jseo: Validate against the shared platform helper script.
+                 check_script(
+                     cmd,
+                     Path(
+-                        f"{get_deploy_dir()}/../platforms/{self.PLATFORM_NAME}/scripts"
++                        f"{get_firesim_install_deploy_dir()}/../platforms/{self.PLATFORM_NAME}/scripts"
+                     ),
+                 )
+                 run(f"""{cmd} --bitstream {bit} --bdf {bdf} --fpga-db {json_db}""")
+@@ -1235,7 +1238,7 @@ class XilinxAlveoInstanceDeployManager(InstanceDeployManager):
+         run(f"cp -r {remote_sim_rsync_dir}/* {remote_sim_dir}/", shell=True)
+ 
+         rsync_cap = rsync_project(
+-            local_dir=f"../platforms/{self.PLATFORM_NAME}/scripts",
++            local_dir=f"{get_firesim_install_deploy_dir()}/../platforms/{self.PLATFORM_NAME}/scripts",
+             remote_dir=remote_sim_dir + "/",
+             ssh_opts="-o StrictHostKeyChecking=no",
+             extra_opts="-L -p",
+@@ -1261,9 +1264,12 @@ class XilinxAlveoInstanceDeployManager(InstanceDeployManager):
+         with cd(remote_sim_dir):
+             # Use a system wide installed firesim-generate-fpga-db.py
+             cmd = f"{script_path}/firesim-generate-fpga-db.py"
++            #jseo: Validate against the shared platform helper script.
+             check_script(
+                 cmd,
+-                Path(f"{get_deploy_dir()}/../platforms/{self.PLATFORM_NAME}/scripts"),
++                Path(
++                    f"{get_firesim_install_deploy_dir()}/../platforms/{self.PLATFORM_NAME}/scripts"
++                ),
+             )
+             run(
+                 f"""{cmd} --bitstream {bitstream} --driver {driver} --out-db-json {json_db}"""
+diff --git a/deploy/runtools/runtime_config.py b/deploy/runtools/runtime_config.py
+index 5d7d1cfed..da467b04b 100644
+--- a/deploy/runtools/runtime_config.py
++++ b/deploy/runtools/runtime_config.py
+@@ -44,7 +44,8 @@ from util.deepmerge import deep_merge
+ from util.streamlogger import InfoStreamLogger
+ from util.export import create_export_string
+ from util.targetprojectutils import extra_target_project_make_args, resolve_path
+-from buildtools.bitbuilder import get_deploy_dir
++#jseo: Resolve drivers and source from the shared FireSim installation.
++from buildtools.bitbuilder import get_firesim_install_deploy_dir
+ from util.io import downloadURI
+ 
+ from typing import Optional, Dict, Any, List, Sequence, Tuple, TYPE_CHECKING
+@@ -53,9 +54,12 @@ import argparse  # this is not within a if TYPE_CHECKING: scope so the `register
+ if TYPE_CHECKING:
+     from runtools.utils import MacAddress
+ 
+-LOCAL_DRIVERS_BASE = "../sim/output"
+-LOCAL_DRIVERS_GENERATED_SRC = "../sim/generated-src"
+-CUSTOM_RUNTIMECONFS_BASE = "../sim/custom-runtime-configs"
++#jseo: Driver/runtime collateral belongs to the shared FireSim installation,
++# not the per-user mutable manager directory selected by FIRESIM_DEPLOY_DIR.
++FIRESIM_INSTALL_SIM_DIR = Path(get_firesim_install_deploy_dir()).parent / "sim"
++LOCAL_DRIVERS_BASE = str(FIRESIM_INSTALL_SIM_DIR / "output")
++LOCAL_DRIVERS_GENERATED_SRC = str(FIRESIM_INSTALL_SIM_DIR / "generated-src")
++CUSTOM_RUNTIMECONFS_BASE = str(FIRESIM_INSTALL_SIM_DIR / "custom-runtime-configs")
+ 
+ rootLogger = logging.getLogger()
+ 
+@@ -406,8 +410,12 @@ class RuntimeHWConfig:
+     def local_quintuplet_path(self) -> Path:
+         """return the local path of the quintuplet folder. the tarball that is created goes inside this folder"""
+         quintuplet = self.get_deployquintuplet_for_config()
++        #jseo: Driver artifacts are installed under the shared FireSim tree.
+         return (
+-            Path(get_deploy_dir()) / "../sim/output" / self.get_platform() / quintuplet
++            FIRESIM_INSTALL_SIM_DIR
++            / "output"
++            / self.get_platform()
++            / quintuplet
+         )
+ 
+     def local_tarball_path(self, name: str) -> Path:
+@@ -699,7 +707,8 @@ class RuntimeHWConfig:
+             f"Building {self.driver_type_message} driver for {str(self.get_deployquintuplet_for_config())}"
+         )
+ 
+-        deploy_dir = get_deploy_dir()
++        #jseo: Driver builds use the shared source installation.
++        deploy_dir = get_firesim_install_deploy_dir()
+         with InfoStreamLogger("stdout"), prefix(f"cd {deploy_dir}/../"), prefix(
+             create_export_string({"RISCV", "PATH", "LD_LIBRARY_PATH"})
+         ), prefix("source sourceme-manager.sh --skip-ssh-setup"), prefix("cd sim/"):
+@@ -728,7 +737,10 @@ class RuntimeHWConfig:
+         # After this scope block exists, the entire folder is deleted
+         with TemporaryDirectory() as builddir:
+ 
+-            with InfoStreamLogger("stdout"), prefix(f"cd {get_deploy_dir()}"):
++            #jseo: Resolve driver inputs relative to the shared installation.
++            with InfoStreamLogger("stdout"), prefix(
++                f"cd {get_firesim_install_deploy_dir()}"
++            ):
+                 for local_path, remote_path in paths:
+                     # The `rsync_project()` function does not allow
+                     # copying between two local directories.
+@@ -739,7 +751,12 @@ class RuntimeHWConfig:
+                     cmd = f"rsync {options} {local_dir} {local_remote_dir}"
+ 
+                     results = run(cmd)
+-                    self.handle_failure(results, "local rsync", get_deploy_dir(), cmd)
++                    self.handle_failure(
++                        results,
++                        "local rsync",
++                        get_firesim_install_deploy_dir(),
++                        cmd,
++                    )
+ 
+             # This must be taken outside of a cd context
+             cmd = f"mkdir -p {self.local_quintuplet_path()}"
+diff --git a/deploy/runtools/utils.py b/deploy/runtools/utils.py
+index b2ae77f31..25f692b86 100644
+--- a/deploy/runtools/utils.py
++++ b/deploy/runtools/utils.py
+@@ -13,7 +13,8 @@ import hashlib
+ from tempfile import TemporaryDirectory
+ 
+ from awstools.awstools import get_localhost_instance_id
+-from buildtools.bitbuilder import get_deploy_dir
++#jseo: Privileged helper references come from the shared FireSim installation.
++from buildtools.bitbuilder import get_firesim_install_deploy_dir
+ 
+ from typing import List, Tuple, Type, Optional
+ 
+@@ -203,7 +204,8 @@ def check_script(remote_script_str: str, search_dir: Optional[Path] = None) -> N
+     repo and compare it's contents to ensure they are the same.
+     """
+     if search_dir is None:
+-        search_dir = Path(f"{get_deploy_dir()}/sudo-scripts")
++        #jseo: Do not look for privileged helpers in a user-writable deploy dir.
++        search_dir = Path(f"{get_firesim_install_deploy_dir()}/sudo-scripts")
+ 
+     remote_script = Path(remote_script_str)
+ 

@@ -1,0 +1,99 @@
+diff --git a/boards/firechip/base-workloads/br-base/linux-config b/boards/firechip/base-workloads/br-base/linux-config
+index 4c4857f..0bee5c5 100644
+--- a/boards/firechip/base-workloads/br-base/linux-config
++++ b/boards/firechip/base-workloads/br-base/linux-config
+@@ -57,6 +57,10 @@ CONFIG_INITRAMFS_ROOT_GID=0
+ CONFIG_INITRAMFS_ROOT_UID=0
+ CONFIG_RISCV_DMA_NONCOHERENT=y
+ CONFIG_RISCV_ISA_ZICBOM=y
++# jongseo: enable Linux RVV support for full-V Saturn bitstream
++CONFIG_RISCV_ISA_V=y
++# jongseo: allow userspace vector by default on full-V Saturn bitstream
++CONFIG_RISCV_ISA_V_DEFAULT_ENABLE=y
+ CONFIG_RISCV_ROCC=y
+ CONFIG_STACKPROTECTOR_PER_TASK=y
+ CONFIG_TOOLCHAIN_HAS_ZICBOM=y
+@@ -64,4 +68,3 @@ CONFIG_TOOLCHAIN_HAS_ZIHINTPAUSE=y
+ # CONFIG_RISCV_PMU is not set
+ CONFIG_OVERRIDE_RNG_ENTROPY=y
+ CONFIG_OVERRIDE_RNG_ENTROPY_VALUE=256
+-
+diff --git a/boards/firechip/base-workloads/br-base/overlay/etc/init.d/rcS b/boards/firechip/base-workloads/br-base/overlay/etc/init.d/rcS
+index 4d49b36..8dba4c0 100755
+--- a/boards/firechip/base-workloads/br-base/overlay/etc/init.d/rcS
++++ b/boards/firechip/base-workloads/br-base/overlay/etc/init.d/rcS
+@@ -4,6 +4,9 @@
+ # Start all init scripts in /etc/init.d
+ # executing them in numerical order.
+ #
++# jongseo: make guest userspace layout deterministic while debugging RVV runtime issues
++echo 0 > /proc/sys/kernel/randomize_va_space 2>/dev/null || true
++
+ for i in /etc/init.d/S??* ;do
+ 
+      # Ignore dangling symlinks (if any).
+@@ -24,4 +27,3 @@ for i in /etc/init.d/S??* ;do
+ 	    ;;
+     esac
+ done
+-
+diff --git a/marshal b/marshal
+index 635284f..f260ef6 100755
+--- a/marshal
++++ b/marshal
+@@ -1,13 +1,50 @@
+ #!/usr/bin/env python3
++import os
++import pathlib
+ import sys
++
++_THIS_FILE = pathlib.Path(__file__).resolve()
++_CHIPYARD_ROOT = _THIS_FILE.parents[2]
++_CONDA_PREFIX = _CHIPYARD_ROOT / ".conda-env"
++_CONDA_PYTHON = _CONDA_PREFIX / "bin" / "python"
++_RISCV_TOOLCHAIN_BIN = _CONDA_PREFIX / "riscv-tools" / "bin"
++
++
++def _bootstrap_local_conda():
++    if not _CONDA_PYTHON.exists():
++        return
++
++    current_python = pathlib.Path(sys.executable).resolve()
++    target_python = _CONDA_PYTHON.resolve()
++    path_entries = os.environ.get("PATH", "").split(os.pathsep)
++
++    if current_python == target_python and str(_RISCV_TOOLCHAIN_BIN) in path_entries:
++        return
++
++    new_env = os.environ.copy()
++    new_path = [str(_RISCV_TOOLCHAIN_BIN), str(_CONDA_PREFIX / "bin")]
++    if new_env.get("PATH"):
++        new_path.append(new_env["PATH"])
++    new_env["PATH"] = os.pathsep.join(new_path)
++    new_env.setdefault("CONDA_PREFIX", str(_CONDA_PREFIX))
++    new_env.setdefault("CONDA_DEFAULT_ENV", str(_CONDA_PREFIX))
++
++    os.execvpe(
++        str(_CONDA_PYTHON),
++        [str(_CONDA_PYTHON), str(_THIS_FILE), *sys.argv[1:]],
++        new_env,
++    )
++
++
++_bootstrap_local_conda()
++
+ import argparse
+-import os
+-import logging
+-import wlutil
++import collections
+ import contextlib
++import logging
+ import shutil
+-import collections
+-import pathlib
++
++import wlutil
+ 
+ if not shutil.which('riscv64-unknown-linux-gnu-gcc'):
+     sys.exit("No riscv toolchain detected. Please install riscv-tools.")

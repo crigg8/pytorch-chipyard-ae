@@ -1,0 +1,22 @@
+{
+  "ae_baseline_tag": "v1.0.0",
+  "ae_baseline_commit": "cd48c3e2cdfeb960588aa081316f68264e761769",
+  "validated_image_id": "sha256:aa40c7329844a5208ed32440b33f1f98b4dbfb547b59055eb794b4b4676f1433",
+  "execution": "full-container-u250-v1",
+  "programmer": "host-vivado-ssh-v1",
+  "host_vivado": "2021.1",
+  "hardware": "Alveo U250",
+  "run_id": "local-20261014T104803Z-3612800",
+  "started_at": "2026-10-14T10:48:08.654594+00:00",
+  "ended_at": "2026-10-14T12:15:51.687768+00:00",
+  "exit_code": 0,
+  "workloads": [
+    "smoke-gemm-rvv-4core",
+    "smoke-gemm-gemmini-4core",
+    "smoke-gemm-scalar-16core"
+  ],
+  "verified_outputs_per_workload": [
+    ".completed", "uartlog", "model.log", "autotune.log", "output.bin"
+  ],
+  "scope": "Existing image hardware smoke; this repository integration and full paper experiments require separate image validation."
+}

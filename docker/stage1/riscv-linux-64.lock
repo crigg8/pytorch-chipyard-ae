@@ -1,0 +1,16 @@
+# RISC-V Linux GCC 12.2.0 and its host runtime libraries.
+@EXPLICIT
+https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda#a9f577daf3de00bca7c3c76c0ecbd1de
+https://conda.anaconda.org/conda-forge/linux-64/expat-2.8.1-hecca717_1.conda#e211a78613b9d50a096644b97cede8f7
+https://conda.anaconda.org/conda-forge/linux-64/gmp-6.3.0-hfd2156b_3.conda#576e32739f323438bf69ab006c21be7b
+https://conda.anaconda.org/conda-forge/linux-64/libexpat-2.8.1-hecca717_1.conda#b24d3c612f71e7aa74158d92106318b2
+https://conda.anaconda.org/conda-forge/linux-64/libgcc-16.2.0-ha9f2e26_4.conda#cba14d01083fc62ffd32c24d7d390633
+https://conda.anaconda.org/conda-forge/linux-64/libgcc-ng-16.2.0-h69a702a_4.conda#b3e52878163a841f6fb951989cc0b217
+https://conda.anaconda.org/conda-forge/linux-64/libgomp-16.2.0-he0feb66_4.conda#89d2c1231f47bd818f5d624b9411459d
+https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-16.2.0-h934c35e_4.conda#2f2ef0d96de5bdd8c1270ff22fdf9352
+https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.2.13-h4ab18f5_6.conda#27329162c0dc732bcf67a4e0cd488125
+https://conda.anaconda.org/conda-forge/linux-64/mpc-1.4.0-ha2cb11d_1.conda#f0f6c8691a9ed4099d1f287a444e251a
+https://conda.anaconda.org/conda-forge/linux-64/mpfr-4.2.2-ha2cb11d_1.conda#7dcc10f6c0bc3596d5519a710a84dfd4
+https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.6-hdb14827_1.conda#ee6c0cd80a60961a1f48aa3e0b91f986
+https://conda.anaconda.org/conda-forge/noarch/python_abi-3.10-8_cp310.conda#05e00f3b21e88bb3d658ac700b2ce58c
+https://conda.anaconda.org/ucb-bar/linux-64/riscv-tools-1.0.3-0_h1234567_ga1b1b14.conda#85c9a0d9dd5311aaa2c5064f2c87b496

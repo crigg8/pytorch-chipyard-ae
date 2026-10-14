@@ -1,4 +1,18 @@
-FROM ubuntu:20.04
+FROM mambaorg/micromamba:2.0.5@sha256:8d0d4cad074afe3ac93b58dce88bd2659153d3fa6de3a6968f501710e8d3c832 AS micromamba
+
+FROM ubuntu:20.04 AS riscv-toolchain
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates binutils && \
+    rm -rf /var/lib/apt/lists/*
+COPY --from=micromamba /bin/micromamba /usr/local/bin/micromamba
+COPY docker/stage1/riscv-linux-64.lock /tmp/riscv-linux-64.lock
+RUN micromamba create -y -p /opt/riscv-gcc-12.2.0 -f /tmp/riscv-linux-64.lock && \
+    micromamba clean --all --yes
+COPY docker/stage1/riscv-env.sh /opt/riscv-gcc-12.2.0/env.sh
+COPY docker/stage1/check-riscv-toolchain.sh /usr/local/bin/check-riscv-toolchain
+RUN bash /usr/local/bin/check-riscv-toolchain
+
+FROM ubuntu:20.04 AS stage1
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG CONDA_VERSION=24.11.3
@@ -68,6 +82,9 @@ RUN MAX_JOBS="${MAX_JOBS}" \
     bash scripts/install.sh && \
     conda clean -afy && \
     rm -rf /root/.cache/pip /tmp/triton-chipyard-cache
+
+COPY --from=riscv-toolchain /opt/riscv-gcc-12.2.0 /opt/riscv-gcc-12.2.0
+ENV PATH=/opt/riscv-gcc-12.2.0/riscv-tools/bin:${PATH}
 
 RUN install -m 0755 docker/stage1-entrypoint.sh /usr/local/bin/pytorch-chipyard-stage1
 

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+/bitstreams/
+/results/
+/scripts/figures/results-workload/
+/.download-bitstreams.*/

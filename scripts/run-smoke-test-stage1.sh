@@ -10,9 +10,9 @@ usage() {
 Usage:
   bash scripts/run-smoke-test-stage1.sh [--artifact-root=PATH]
 
-Compile a 32x32x32 GEMM for the RVV, Gemmini, and scalar
-PyTorch-Chipyard backends. The generated plans select RVV 4 cores,
-Gemmini 4 cores, and scalar 16 cores for the host smoke test.
+Compile and link a 32x32x32 GEMM in the Stage 1 image for RVV 4 cores,
+Gemmini 4 cores, and scalar 16 cores. The bundled GCC 12.2.0 produces
+the ELFs consumed directly by the Stage 2 Docker smoke test.
 
 Options:
   --artifact-root=PATH  Artifact root. Default:
@@ -76,8 +76,19 @@ for index in "${!backends[@]}"; do
     "${backend}" "${core}" "${output_dir}"
 done
 
-# The Docker container may run as a remapped root user. Stage 2 is run by the
-# host AE account and must be able to read and update these bind-mounted files.
+bash "${SCRIPT_DIR}/build-chipyard-elves.sh" \
+  --chipyard-env=/opt/riscv-gcc-12.2.0/env.sh \
+  --riscv-gxx=/opt/riscv-gcc-12.2.0/riscv-tools/bin/riscv64-unknown-linux-gnu-g++ \
+  --artifact-dir="${artifact_root}/rvv" \
+  --artifact-dir="${artifact_root}/gemmini" \
+  --artifact-dir="${artifact_root}/scalar"
+
+for index in "${!backends[@]}"; do
+  elf="${artifact_root}/${backends[index]}/model-${cores[index]}core.elf"
+  [[ -s "${elf}" ]] || pc_die "missing linked smoke ELF: ${elf}"
+done
+
+# Keep bind-mounted outputs accessible across the two Docker engines.
 chmod -R a+rwX "${artifact_root}"
 
 printf 'SMOKE_STAGE1_ARTIFACT_ROOT=%s\n' "${artifact_root}"

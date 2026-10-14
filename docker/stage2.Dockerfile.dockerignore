@@ -1,0 +1,17 @@
+# Stage 2 needs orchestration and FPGA artifacts, not the Stage 1 compiler tree.
+**
+!docker/
+!docker/stage2.Dockerfile
+!docker/stage2-entrypoint.sh
+!docker/stage2-local-entrypoint.sh
+!docker/stage2/
+!docker/stage2/**
+!scripts/
+!scripts/**
+!bitstreams/
+!bitstreams/**
+**/__pycache__/
+**/*.pyc
+scripts/.logs/
+scripts/.cache/
+scripts/figures/results-workload/
