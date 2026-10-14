@@ -167,6 +167,8 @@ def main():
     env = dict(os.environ)
     for name in ("LD_LIBRARY_PATH", "LD_PRELOAD", "PYTHONHOME", "PYTHONPATH"):
         env.pop(name, None)
+    subprocess.run([str(prefix / ".conda-env/bin/python3"),
+                    str(Path(__file__).with_name("check-firesim-config.py"))], env=env, check=True)
     check_compilers(prefix, env)
     check_internal_ssh(prefix, env)
     subprocess.run(["/usr/bin/guestfish", "--version"], env=env, check=True)

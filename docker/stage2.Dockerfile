@@ -49,13 +49,17 @@ COPY docker/stage2/ /opt/stage2-support/
 COPY bitstreams/ /opt/firesim-artifacts/
 COPY docker/stage2-entrypoint.sh /usr/local/bin/pytorch-chipyard-stage2
 COPY docker/stage2-local-entrypoint.sh /usr/local/bin/pytorch-chipyard-stage2-local
-RUN /usr/bin/python3 /opt/stage2-support/finalize-image.py && \
+# FireSim parses build recipes even when running prebuilt FPGA bitstreams.
+RUN cp /opt/chipyard/sims/firesim/deploy/sample-backup-configs/sample_config_build_recipes.yaml \
+       /opt/chipyard/sims/firesim/deploy/config_build_recipes.yaml && \
+    /usr/bin/python3 /opt/stage2-support/finalize-image.py && \
     /usr/bin/python3 /opt/stage2-support/patch-runtime.py /opt/chipyard && \
     /usr/bin/python3 /opt/stage2-support/patch-local.py /opt/chipyard && \
     chmod 0755 /usr/local/bin/pytorch-chipyard-stage2* /usr/local/bin/firesim-* && \
     git config --system --add safe.directory '*' && \
     /usr/bin/python3 /opt/pytorch-chipyard/scripts/prepare-firesim-hwdb.py \
-      --bitstream-dir /opt/firesim-artifacts --output /opt/stage2-metadata/config_hwdb.yaml
+      --bitstream-dir /opt/firesim-artifacts --output /opt/stage2-metadata/config_hwdb.yaml && \
+    /opt/chipyard/.conda-env/bin/python3 /opt/stage2-support/check-firesim-config.py
 
 LABEL org.opencontainers.image.title="PyTorch-Chipyard Stage2" \
       org.pytorch-chipyard.stage2.execution="full-container-u250-v1" \
