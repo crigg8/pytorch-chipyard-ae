@@ -152,6 +152,27 @@ class LocalDockerTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "exactly one card"):
             local_runtime.selected_device(self.db)
 
+    def test_container_helpers_use_mounted_db_after_ssh_sudo_environment_reset(self):
+        sysfs = self.fake_sysfs()
+        dev = self.root / "dev"
+        dev.mkdir()
+        device_numbers = local_runtime.device_numbers
+        sync_devices = local_runtime.sync_devices
+        for env in ({}, {"FIRESIM_DB": str(self.root / "unrelated-host-db.json")}):
+            with self.subTest(env=env), patch.dict(os.environ, env, clear=True), \
+                    patch.object(local_runtime, "CONTAINER_FPGA_DB", self.db), \
+                    patch.object(local_runtime, "device_numbers", side_effect=lambda db, *_: device_numbers(db, sysfs)), \
+                    patch.object(local_runtime, "sync_devices", side_effect=lambda db: sync_devices(db, sysfs, dev)), \
+                    patch.object(local_runtime.os, "mknod") as create:
+                with patch.object(sys, "argv", ["helper", "devices"]):
+                    local_runtime.main()
+                self.assertEqual(create.call_count, 3)
+                with patch.object(sys, "argv", ["helper", "pci", "0000:3f:00.0"]):
+                    local_runtime.main()
+                with patch.object(sys, "argv", ["helper", "pci", "0000:af:00.0"]):
+                    with self.assertRaisesRegex(RuntimeError, "different FPGA"):
+                        local_runtime.main()
+
     def test_launch_separates_programming_ssh_from_private_container_runtime(self):
         source, _, _ = self.hardware()
         artifacts = self.root / "artifacts"

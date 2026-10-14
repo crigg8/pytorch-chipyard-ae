@@ -89,10 +89,32 @@ def check_internal_ssh(prefix, env):
                            'assert str(run("id -u")).strip()=="0"\n')
                 subprocess.run([str(prefix / ".conda-env/bin/python3"), "-c", program,
                                 str(key), str(client), str(root / "known_hosts")], env=env, check=True)
+                check_device_helpers(client)
                 check_programming_transport(root, client)
             finally:
                 server.terminate()
                 server.wait(timeout=10)
+
+
+def check_device_helpers(client):
+    """Exercise the installed helpers over SSH/sudo without touching devices."""
+    from local_runtime import CONTAINER_FPGA_DB
+    CONTAINER_FPGA_DB.parent.mkdir(parents=True, exist_ok=True)
+    # Exclusive creation prevents overwriting a real mounted DB. An empty DB
+    # must be rejected before either helper can inspect or change any device.
+    with CONTAINER_FPGA_DB.open("x") as stream:
+        stream.write("[]\n")
+    try:
+        for helper in ("firesim-chmod-xdma-perm", "firesim-change-pcie-perms"):
+            checked = subprocess.run(
+                ["ssh", "-F", str(client), "127.0.0.1",
+                 "/usr/bin/env -i PATH=/usr/bin:/bin /usr/bin/sudo -n /usr/local/bin/" + helper],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+            if not checked.returncode or "FPGA DB must contain exactly one card" not in checked.stdout:
+                raise RuntimeError(helper + " failed the SSH/sudo DB check:\n" + checked.stdout)
+    finally:
+        CONTAINER_FPGA_DB.unlink()
+    print("STAGE2_LOCAL_DEVICE_HELPERS_STATUS=PASS", flush=True)
 
 
 def check_programming_transport(root, client):

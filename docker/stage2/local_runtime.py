@@ -16,6 +16,8 @@ import sys
 import time
 from urllib.parse import unquote, urlparse
 
+CONTAINER_FPGA_DB = Path("/run/stage2/fpga-db.json")
+
 
 def sha(path):
     result = hashlib.sha256()
@@ -150,19 +152,22 @@ def copy_results(server, slotno):
 
 def main():
     action = sys.argv[1]
+    # These CLI helpers run through container SSH and sudo, which discard the
+    # manager's environment. The launcher always mounts the selected DB here.
+    db = CONTAINER_FPGA_DB
     if action == "devices":
         # Re-enumeration is asynchronous; retry device discovery, never modprobe.
         deadline = time.monotonic() + 15
         while True:
             try:
-                sync_devices()
+                sync_devices(db)
                 return
             except (OSError, RuntimeError):
                 if time.monotonic() >= deadline:
                     raise
                 time.sleep(0.25)
     elif action == "pci":
-        _, bdf, _ = device_numbers()
+        _, bdf, _ = device_numbers(db)
         if len(sys.argv) != 3 or sys.argv[2].lower() != bdf:
             raise RuntimeError("helper requested a different FPGA")
     else:
