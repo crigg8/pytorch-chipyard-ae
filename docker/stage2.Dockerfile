@@ -44,6 +44,13 @@ RUN bash /opt/stage2-support/install-sources.sh
 COPY docker/stage2/requirements.txt /opt/stage2-support/
 RUN /opt/chipyard/.conda-env/bin/python -m pip install --no-cache-dir --no-deps -r /opt/stage2-support/requirements.txt
 
+# The packaged RISC-V ar/ranlib require libfl; flex alone does not install it
+# with --no-install-recommends.
+RUN apt-get update && apt-get install -y --no-install-recommends libfl2 && \
+    rm -rf /var/lib/apt/lists/* && \
+    riscv64-unknown-linux-gnu-ar --version && \
+    riscv64-unknown-linux-gnu-ranlib --version
+
 COPY scripts/ /opt/pytorch-chipyard/scripts/
 COPY docker/stage2/ /opt/stage2-support/
 COPY bitstreams/ /opt/firesim-artifacts/

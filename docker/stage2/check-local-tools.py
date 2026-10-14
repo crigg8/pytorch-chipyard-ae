@@ -154,7 +154,12 @@ def check_compilers(prefix, env):
         guest = root / "guest.elf"
         subprocess.run(["gcc", str(source), "-o", str(host)], env=env, check=True)
         subprocess.run([str(host)], env=env, check=True)
-        subprocess.run(["riscv64-unknown-linux-gnu-gcc", str(source), "-fopenmp", "-o", str(guest)], env=env, check=True)
+        obj = root / "hello.o"
+        archive = root / "libhello.a"
+        subprocess.run(["riscv64-unknown-linux-gnu-gcc", "-c", str(source), "-o", str(obj)], env=env, check=True)
+        subprocess.run(["riscv64-unknown-linux-gnu-ar", "rcs", str(archive), str(obj)], env=env, check=True)
+        subprocess.run(["riscv64-unknown-linux-gnu-ranlib", str(archive)], env=env, check=True)
+        subprocess.run(["riscv64-unknown-linux-gnu-gcc", str(archive), "-fopenmp", "-o", str(guest)], env=env, check=True)
         header = subprocess.check_output(["readelf", "-h", str(guest)], env=env, text=True)
         assert "RISC-V" in header and "double-float ABI" in header
     subprocess.run(["bash", "-c", "source ./sourceme-manager.sh --skip-ssh-setup; test \"$FIRESIM_ENV_SOURCED\" = 1"],
