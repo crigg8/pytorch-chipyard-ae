@@ -34,6 +34,9 @@ Unpack the Zenodo archive in the home directory so that the artifact root is
 
 Because the Docker image build and Stage 2 simulations can take a long time, run them inside a `tmux` session so that they continue if the SSH connection is interrupted.
 
+Stage 1 uses rootless Docker. Stage 2 uses system Docker through sudo.
+An administrator sets up [Docker sudo access](docs/stage2-docker.md#docker-sudo-access) once.
+
 ```bash
 # or Download it from Zenodo
 git clone --branch v1.0.0 --depth 1 \
@@ -42,7 +45,8 @@ git clone --branch v1.0.0 --depth 1 \
 cd ~/pytorch-chipyard-ae
 bash scripts/download-bitstreams.sh
 
-source ~/.bashrc
+unset DOCKER_CONTEXT
+export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 
 # Stage 1
 docker build \
@@ -51,7 +55,7 @@ docker build \
   .
 
 # Stage 2
-docker build \
+sudo -n /usr/bin/docker --host unix:///var/run/docker.sock build \
   -f docker/stage2.Dockerfile \
   -t pytorch-chipyard:stage2 \
   .
@@ -78,12 +82,14 @@ A successful run prints `SMOKE_STAGE1_STATUS=PASS`.
 ### Stage 2
 
 Run the FPGA tests with the host login key loaded in your SSH agent.
-The command uses system Docker directly or the installed restricted smoke profile.
-For accounts allowed passwordless `sudo /usr/bin/docker`, set
-`STAGE2_DOCKER_SUDO=1` and build the Stage 2 image with `sudo docker`; image
-registration is then unnecessary.
+The launcher uses sudo Docker and the Stage 1 outputs directly; no image
+registration is required.
 
 ```bash
+unset FIRESIM_HWDB_PATH RUN_ID
+export STAGE2_DOCKER_SUDO=1
+export STAGE2_DOCKER_HOST=unix:///var/run/docker.sock
+
 export FIRESIM_SSH_HOST=fpga.example.org  # replace with the FPGA host IP/DNS
 export FIRESIM_SSH_USER="$(id -un)"
 export FIRESIM_VIVADO_DIR=/absolute/path/to/Vivado/2021.1
@@ -128,6 +134,8 @@ over SSH to host Vivado; the host XDMA module remains loaded.
 Use system Docker and the SSH/Vivado settings from the smoke test.
 
 ```bash
+export STAGE2_DOCKER_SUDO=1
+export STAGE2_DOCKER_HOST=unix:///var/run/docker.sock
 export STAGE2_ARTIFACT_DIR="$PWD/examples"
 export STAGE2_STATE_ROOT="$HOME/.local/share/pytorch-chipyard-stage2-local"
 

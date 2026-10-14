@@ -11,11 +11,31 @@ The successful reference smoke run is recorded in
 three GEMM workloads on U250, not the complete paper evaluation or every image
 rebuilt from this checkout.
 
+## Docker sudo access
+
+For the README workflow, an administrator grants Docker sudo access once.
+For the `ae` account:
+
+```bash
+sudoers_file="$(mktemp)"
+printf '%s\n' 'ae ALL=(root) NOPASSWD: /usr/bin/docker' > "$sudoers_file"
+sudo visudo -cf "$sudoers_file" &&
+sudo install -o root -g root -m 0440 "$sudoers_file" /etc/sudoers.d/ae-docker
+rm -f "$sudoers_file"
+```
+
+Docker sudo access grants effective host root access. Build Stage 2 with
+`sudo /usr/bin/docker` and set `STAGE2_DOCKER_SUDO=1` when launching it. Both use
+system Docker without image export or profile registration. Stage 1 continues
+to use rootless Docker.
+
 ## Build the image
 
 ```bash
-docker build -f docker/stage2.Dockerfile -t pytorch-chipyard:stage2 .
-docker run --rm --init --shm-size=1g pytorch-chipyard:stage2 --check-tools
+sudo -n /usr/bin/docker --host unix:///var/run/docker.sock build \
+  -f docker/stage2.Dockerfile -t pytorch-chipyard:stage2 .
+sudo -n /usr/bin/docker --host unix:///var/run/docker.sock run \
+  --rm --init --shm-size=1g pytorch-chipyard:stage2 --check-tools
 ```
 
 Download the release bitstreams using `scripts/download-bitstreams.sh` first.
@@ -36,8 +56,9 @@ and internal SSH without FPGA access. Hardware validation is a separate run.
 
 ## Transfer the image to system Docker
 
-Rootless and system Docker have separate image stores. Export from the build
-engine, using the same checkout that will be used for installation:
+Skip this section when building directly on system Docker as shown above.
+For an image built on rootless Docker, export from that build engine using
+the same checkout that will be used for installation:
 
 ```bash
 mkdir -p "$HOME/stage2-delivery"
@@ -55,12 +76,6 @@ For a general system-Docker launch, an administrator can instead load it with:
 sudo docker --host unix:///var/run/docker.sock image load \
   --input "$HOME/stage2-delivery/stage2-local.tar"
 ```
-
-The fixed smoke profile keeps Docker privileges restricted. An account trusted
-with unrestricted `sudo /usr/bin/docker` can instead build on system Docker and
-set `STAGE2_DOCKER_SUDO=1` for smoke tests and full experiments. This bypasses
-the fixed profile and image registration; Docker sudo access grants effective
-host root access.
 
 ## FPGA host preparation
 
@@ -101,6 +116,9 @@ administrator-approved access to system Docker.
 
 ## Restricted ae smoke profile
 
+This alternative applies only to accounts without general Docker sudo access.
+Skip it for the README workflow.
+
 Run the Stage 1 smoke test shown in the README first. It compiles and links
 all three ELFs with the image's bundled GCC 12.2.0.
 An **administrator** then runs this from the same source checkout used to
@@ -134,8 +152,9 @@ Existing FireSim helper permissions remain an administrator-managed prerequisite
 In the **ae terminal**:
 
 ```bash
-if [[ ! -S "${SSH_AUTH_SOCK:-}" ]]; then eval "$(ssh-agent -s)"; fi
-if ! ssh-add -l >/dev/null 2>&1; then ssh-add; fi
+unset STAGE2_DOCKER_SUDO FIRESIM_HWDB_PATH
+eval "$(ssh-agent -s)"
+ssh-add
 bash scripts/run-smoke-test-stage2-docker.sh --ssh-agent "$SSH_AUTH_SOCK"
 ```
 
@@ -148,8 +167,9 @@ RUN_ID=previous-run-id bash scripts/run-smoke-test-stage2-docker.sh \
 
 Its results are under
 `/var/lib/pytorch-chipyard-stage2-local/runs/<run-id>/results`.
-The public command selects the restricted launcher when the account cannot
-access system Docker. It checks that the image in the build Docker engine
+The public command selects the restricted launcher when `STAGE2_DOCKER_SUDO`
+is unset and the account cannot access system Docker. It checks that the image
+in the build Docker engine
 and the current Stage 1 outputs match the installed profile before running.
 Changed images or inputs require a profile refresh; the command refuses to
 silently test older installed artifacts.
