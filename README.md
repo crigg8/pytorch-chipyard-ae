@@ -77,8 +77,8 @@ A successful run prints `SMOKE_STAGE1_STATUS=PASS`.
 
 ### Stage 2
 
-Run the FPGA tests with system Docker access and the host login key loaded
-in your SSH agent:
+Run the FPGA tests with the host login key loaded in your SSH agent.
+The command uses system Docker directly or the installed restricted smoke profile:
 
 ```bash
 export FIRESIM_SSH_HOST=fpga.example.org  # replace with the FPGA host IP/DNS

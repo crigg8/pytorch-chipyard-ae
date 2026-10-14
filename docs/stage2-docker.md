@@ -133,18 +133,23 @@ In the **ae terminal**:
 ```bash
 if [[ ! -S "${SSH_AUTH_SOCK:-}" ]]; then eval "$(ssh-agent -s)"; fi
 if ! ssh-add -l >/dev/null 2>&1; then ssh-add; fi
-sudo -n /usr/local/sbin/run-stage2-local-smoke --ssh-agent "$SSH_AUTH_SOCK"
+bash scripts/run-smoke-test-stage2-docker.sh --ssh-agent "$SSH_AUTH_SOCK"
 ```
 
 To resume the same installed smoke run:
 
 ```bash
-sudo -n /usr/local/sbin/run-stage2-local-smoke \
-  --ssh-agent "$SSH_AUTH_SOCK" --resume previous-run-id
+RUN_ID=previous-run-id bash scripts/run-smoke-test-stage2-docker.sh \
+  --ssh-agent "$SSH_AUTH_SOCK" --resume
 ```
 
 Its results are under
 `/var/lib/pytorch-chipyard-stage2-local/runs/<run-id>/results`.
+The public command selects the restricted launcher when the account cannot
+access system Docker. It checks that the image in the build Docker engine
+and the current Stage 1 outputs match the installed profile before running.
+Changed images or inputs require a profile refresh; the command refuses to
+silently test older installed artifacts.
 Reinstalling a profile changes its pinned configuration; finish or preserve
 ongoing runs before an administrator updates the installation.
 
