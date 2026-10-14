@@ -145,14 +145,17 @@ def main():
     if not endpoint.startswith("unix://"):
         parser.error("local execution requires a local Unix Docker socket")
     docker_env["DOCKER_HOST"] = endpoint
+    # sudo normally drops DOCKER_HOST; pass the selected engine explicitly.
+    docker = (["sudo", "-n", "/usr/bin/docker", "--host", endpoint]
+              if os.environ.get("STAGE2_DOCKER_SUDO") == "1" else ["docker"])
     image = os.environ.get("STAGE2_IMAGE", "pytorch-chipyard:stage2")
     image_id = "<resolved-at-launch>"
     lock_fd = None
     if not args.print_command:
-        security = subprocess.check_output(["docker", "info", "--format", "{{json .SecurityOptions}}"], env=docker_env, text=True)
+        security = subprocess.check_output(docker + ["info", "--format", "{{json .SecurityOptions}}"], env=docker_env, text=True)
         if "name=rootless" in security:
             parser.error("local FPGA control requires rootful system Docker")
-        metadata = json.loads(subprocess.check_output(["docker", "image", "inspect", image], env=docker_env, text=True))[0]
+        metadata = json.loads(subprocess.check_output(docker + ["image", "inspect", image], env=docker_env, text=True))[0]
         if metadata.get("Config", {}).get("Labels", {}).get("org.pytorch-chipyard.stage2.execution") != "full-container-u250-v1":
             parser.error("build/load the Stage2 container execution image")
         if metadata["Config"]["Labels"].get("org.pytorch-chipyard.stage2.programmer") != "host-vivado-ssh-v1":
@@ -175,7 +178,7 @@ def main():
         if "," in str(path):
             parser.error("bind mount path contains a comma: " + str(path))
     name = "stage2-local-" + str(uid) + "-" + run_id
-    command = ["docker", "run", "--rm", "--init", "--name", name, "--stop-timeout", "30",
+    command = docker + ["run", "--rm", "--init", "--name", name, "--stop-timeout", "30",
                "--userns=host", "--shm-size=1g", "--cap-add=MKNOD",
                "--device-cgroup-rule=c *:* rwm", "--add-host=host.docker.internal:host-gateway"]
 
@@ -254,7 +257,7 @@ def main():
         return
 
     def stop(signum, frame):
-        subprocess.run(["docker", "stop", "--time", "30", name], env=docker_env, check=False)
+        subprocess.run(docker + ["stop", "--time", "30", name], env=docker_env, check=False)
 
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)

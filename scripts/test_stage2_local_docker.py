@@ -9,6 +9,7 @@ import sys
 import socket
 import hashlib
 import io
+import signal
 import tempfile
 import types
 import unittest
@@ -192,6 +193,47 @@ class LocalDockerTests(unittest.TestCase):
                                     env=env, text=True, capture_output=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("FIRESIM_DB to the absolute path", result.stderr)
+
+    def test_sudo_docker_keeps_the_selected_engine_caller_and_stop_command(self):
+        artifacts = self.root / "artifacts"
+        artifacts.mkdir()
+        endpoint = "unix:///run/system-docker-fixture.sock"
+        prefix = ["sudo", "-n", "/usr/bin/docker", "--host", endpoint]
+        image_id = "sha256:" + "a" * 64
+        metadata = [{"Id": image_id, "Config": {"Labels": {
+            "org.pytorch-chipyard.stage2.execution": "full-container-u250-v1",
+            "org.pytorch-chipyard.stage2.programmer": "host-vivado-ssh-v1"}}}]
+        env = {"STAGE2_DOCKER_SUDO": "1", "STAGE2_DOCKER_HOST": endpoint,
+               "DOCKER_HOST": "unix:///wrong-rootless.sock", "DOCKER_CONTEXT": "wrong-context",
+               "STAGE2_ARTIFACT_DIR": str(artifacts), "FIRESIM_DB": str(self.db),
+               "STAGE2_STATE_ROOT": str(self.root / "state"), "RUN_ID": "sudo-fixture",
+               "SSH_AUTH_SOCK": str(self.agent)}
+        handlers = {}
+
+        def run(command, **kwargs):
+            if command[len(prefix)] == "run":
+                handlers[signal.SIGTERM](signal.SIGTERM, None)
+            return subprocess.CompletedProcess(command, 0)
+
+        with tempfile.TemporaryFile() as lock, patch.dict(os.environ, env, clear=True), \
+                patch.object(sys, "argv", ["launcher", "--preflight-only"]), \
+                patch.object(launcher.os, "open", return_value=lock.fileno()), \
+                patch.object(launcher, "require_no_host_simulation"), \
+                patch.object(launcher, "device_numbers"), \
+                patch.object(launcher.signal, "signal", side_effect=lambda sig, fn: handlers.update({sig: fn})), \
+                patch.object(launcher.subprocess, "check_output", side_effect=['[]', json.dumps(metadata)]) as check, \
+                patch.object(launcher.subprocess, "run", side_effect=run) as execute:
+            launcher.main()
+        calls = check.call_args_list + execute.call_args_list
+        self.assertEqual([call.args[0][len(prefix)] for call in calls], ["info", "image", "run", "stop"])
+        for call in calls:
+            self.assertEqual(call.args[0][:len(prefix)], prefix)
+            self.assertEqual(call.kwargs["env"]["DOCKER_HOST"], endpoint)
+            self.assertNotIn("DOCKER_CONTEXT", call.kwargs["env"])
+        command = execute.call_args_list[0].args[0]
+        self.assertIn(image_id, command)
+        self.assertIn("STAGE2_OUTPUT_UID=" + str(os.getuid()), command)
+        self.assertIn("STAGE2_OUTPUT_GID=" + str(os.getgid()), command)
 
     def test_container_result_collection_marks_complete_only_after_guest_copy(self):
         destination = self.root / "results"

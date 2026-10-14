@@ -80,8 +80,9 @@ class SmokeDispatchTests(unittest.TestCase):
         self.assertEqual(execute.call_args.args, ('sudo', ['sudo', '-n', str(entry), '--ssh-agent', '/tmp/agent.sock']))
 
     def test_direct_and_print_command_paths_do_not_require_a_restricted_profile(self):
-        for arguments, access in (([], True), (['--print-command'], False)):
-            with self.subTest(arguments=arguments), patch.dict(os.environ, {}, clear=True), \
+        for arguments, access, env in (([], True, {}), (['--print-command'], False, {}),
+                                       ([], False, {'STAGE2_DOCKER_SUDO': '1'})):
+            with self.subTest(arguments=arguments, env=env), patch.dict(os.environ, env, clear=True), \
                     patch.object(sys, 'argv', ['launcher', *arguments]), \
                     patch.object(launcher.os, 'access', return_value=access), \
                     patch.object(launcher.os, 'geteuid', return_value=1000), \

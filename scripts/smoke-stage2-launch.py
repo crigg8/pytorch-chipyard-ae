@@ -85,7 +85,8 @@ def main():
     args = parser.parse_args()
     endpoint = urlparse(os.environ.get('STAGE2_DOCKER_HOST', 'unix:///var/run/docker.sock'))
     socket = unquote(endpoint.path)
-    if (args.print_command or os.geteuid() == 0 or endpoint.scheme != 'unix'
+    if (args.print_command or os.environ.get('STAGE2_DOCKER_SUDO') == '1'
+            or os.geteuid() == 0 or endpoint.scheme != 'unix'
             or socket not in ('/var/run/docker.sock', '/run/docker.sock')
             or os.access(socket, os.R_OK | os.W_OK)):
         os.execvp('bash', ['bash', str(REPO / 'scripts/run-stage2-docker.sh'),

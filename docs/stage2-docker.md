@@ -56,8 +56,11 @@ sudo docker --host unix:///var/run/docker.sock image load \
   --input "$HOME/stage2-delivery/stage2-local.tar"
 ```
 
-This administrator command is not a sudo rule to give to `ae`. Keep `ae`'s
-existing restricted permissions when using the fixed smoke profile.
+The fixed smoke profile keeps Docker privileges restricted. An account trusted
+with unrestricted `sudo /usr/bin/docker` can instead build on system Docker and
+set `STAGE2_DOCKER_SUDO=1` for smoke tests and full experiments. This bypasses
+the fixed profile and image registration; Docker sudo access grants effective
+host root access.
 
 ## FPGA host preparation
 
@@ -184,6 +187,7 @@ The general launcher uses these settings:
 | Setting | Meaning |
 | --- | --- |
 | `STAGE2_IMAGE` | Final image tag/ID; default `pytorch-chipyard:stage2` |
+| `STAGE2_DOCKER_SUDO` | Set `1` to call `/usr/bin/docker` through passwordless sudo, bypassing the fixed smoke profile |
 | `STAGE2_ARTIFACT_DIR` | Completed full-model ELF/input tree; default `<checkout>/examples` |
 | `STAGE2_SMOKE_ARTIFACT_DIR` | Smoke input tree; default `<checkout>/results/smoke-test/artifacts/pytorch-chipyard` |
 | `FIRESIM_SSH_HOST`, `FIRESIM_SSH_USER` | Host programming SSH destination and account |
