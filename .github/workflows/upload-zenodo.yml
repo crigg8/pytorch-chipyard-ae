@@ -1,0 +1,119 @@
+
+name: Upload to Zenodo
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_type:
+        description: "ZIP file to upload"
+        required: true
+        type: choice
+        options:
+          - source-code
+          - bitstreams
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Download GitHub Release ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP_TYPE: ${{ inputs.zip_type }}
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+
+          if [ "$ZIP_TYPE" = "source-code" ]; then
+            FILE="staging/pytorch-chipyard-ae-v1.0.0.zip"
+            gh release download v1.0.0 \
+              -R crigg8/pytorch-chipyard-ae \
+              --archive zip --output "$FILE"
+          else
+            FILE="staging/bitstreams.zip"
+            gh release download v1.0.0 \
+              -R crigg8/pytorch-chipyard-ae \
+              --pattern bitstreams.zip --dir staging
+          fi
+
+          test -s "$FILE"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+          echo "NAME=$(basename "$FILE")" >> "$GITHUB_ENV"
+          ls -lh "$FILE"
+
+      - name: Upload ZIP to Zenodo
+        env:
+          ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ZENODO_TOKEN"
+
+          BASE="https://zenodo.org/api/records/23375353/draft/files"
+          AUTH="Authorization: Bearer $ZENODO_TOKEN"
+
+          # Check for duplicate or pending files
+          LIST=$(curl -fsS -H "$AUTH" "$BASE")
+
+          if echo "$LIST" | jq -e \
+            --arg k "$NAME" \
+            '.entries[]? | select(.key == $k)' >/dev/null; then
+            echo "File already exists: $NAME"
+            echo "Delete the old entry in Zenodo and rerun."
+            exit 1
+          fi
+
+          # Register file
+          BODY=$(jq -nc --arg k "$NAME" '[{key:$k}]')
+          REG=$(curl -fsS -X POST "$BASE" \
+            -H "$AUTH" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+
+          UPLOAD=$(echo "$REG" | jq -r '.entries[0].links.content // empty')
+          COMMIT=$(echo "$REG" | jq -r '.entries[0].links.commit // empty')
+
+          test -n "$UPLOAD"
+          test -n "$COMMIT"
+
+          # Upload data
+          echo "Uploading $NAME to Zenodo..."
+
+          curl -fS --progress-bar \
+            --connect-timeout 30 \
+            --max-time 2700 \
+            -A "ResearchArtifactUploader/1.0" \
+            -H "$AUTH" \
+            -H "Content-Type: application/octet-stream" \
+            -T "$FILE" \
+            -o /dev/null \
+            "$UPLOAD"
+
+          # Commit file
+          echo "Committing..."
+          curl -fsS -X POST \
+            -H "$AUTH" "$COMMIT" >/dev/null
+
+          # Verify
+          LIST=$(curl -fsS -H "$AUTH" "$BASE")
+          ENTRY=$(echo "$LIST" | jq -c \
+            --arg k "$NAME" \
+            '.entries[]? | select(.key == $k)')
+
+          STATUS=$(echo "$ENTRY" | jq -r '.status')
+          MD5=$(echo "$ENTRY" | jq -r '.checksum')
+          SIZE=$(echo "$ENTRY" | jq -r '.size')
+
+          LOCAL_MD5=$(md5sum "$FILE" | cut -d ' ' -f1)
+          LOCAL_SIZE=$(stat -c%s "$FILE")
+
+          test "$STATUS" = "completed"
+          test "$MD5" = "md5:$LOCAL_MD5"
+          test "$SIZE" = "$LOCAL_SIZE"
+
+          echo "UPLOAD SUCCESS"
+          echo "https://zenodo.org/uploads/23375353"
