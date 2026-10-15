@@ -84,6 +84,8 @@ jobs:
           echo "Uploading $NAME to Zenodo..."
 
           curl -fS --progress-bar \
+            --retry 2 \
+            --retry-delay 30 \
             --connect-timeout 30 \
             --max-time 2700 \
             -A "ResearchArtifactUploader/1.0" \
