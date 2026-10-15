@@ -26,8 +26,8 @@ Run the Stage 2 host workflow in order:
   5. Complete Table 4's sampled-kernel FireSim and Verilator measurements
      when running the complete, non-selective workflow.
 
-By default, collected FireSim workloads with a valid .completed marker and
-required result logs are skipped. Table 4 also resumes passed measurements.
+By default, workloads with nonempty model.log and autotune.log files are
+skipped. Table 4 also resumes passed measurements.
 
 Options:
   --experiment=NAME     Run one resumable paper experiment unit. NAME is one of:
@@ -52,8 +52,8 @@ Options:
                         Build and run only the four CNN Gemmini 4-core
                         alias-first off workloads.
   --resume, --resume-firesim
-                        Skip ELF/package stages, keep collected results, and
-                        build/run/clean one incomplete FireSim workload at a time.
+                        Explicitly request the default behavior: keep collected
+                        results and run only workloads without result logs.
   --resume-rebuild-images
                         Skip ELF/package stages, deep-clean Linux/OpenSBI,
                         rebuild images only for workloads without complete
@@ -191,8 +191,6 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --resume | --resume-firesim)
       resume_firesim=1
-      skip_elves=1
-      skip_package=1
       skip_images=0
       shift
       ;;
@@ -295,8 +293,8 @@ fi
 if [[ -n "${experiment_arg}" ]]; then
   if [[ "${#workload_args[@]}" -gt 0 || "${only_alias_first}" -eq 1 || \
         "${only_alias_first_cnn_off}" -eq 1 || "${only_table4}" -eq 1 || \
-        "${resume_firesim}" -eq 1 || -n "${resume_from_arg}" ]]; then
-    die "--experiment cannot be combined with another workload, resume, or only-selection option"
+        "${rebuild_pending_images}" -eq 1 || -n "${resume_from_arg}" ]]; then
+    die "--experiment cannot be combined with another workload, rebuild/from-resume, or only-selection option"
   fi
 
   case "${experiment_arg}" in
@@ -653,15 +651,7 @@ collected_result_complete() {
   local workload="$1"
   local result_dir="${PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR}/${workload}"
 
-  [[ -f "${result_dir}/.completed" ]] || return 1
-  [[ -s "${result_dir}/model.log" ]] || return 1
-  [[ -s "${result_dir}/autotune.log" ]] || return 1
-  if should_collect_output_bin "${workload}"; then
-    [[ -s "${result_dir}/output.bin" ]] || return 1
-  fi
-  if [[ -f "${result_dir}/run.log" ]]; then
-    grep -Fq '[runner] model_ret=0' "${result_dir}/run.log" || return 1
-  fi
+  [[ -s "${result_dir}/model.log" && -s "${result_dir}/autotune.log" ]]
 }
 
 append_unique_workload() {

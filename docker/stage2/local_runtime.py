@@ -19,6 +19,51 @@ from urllib.parse import unquote, urlparse
 CONTAINER_FPGA_DB = Path("/run/stage2/fpga-db.json")
 
 
+def collect_results(state, destination):
+    """Consolidate legacy per-run outputs without removing their originals.
+
+    Keep the newest complete log pair and its matching files from the same run.
+    Run-level status is irrelevant: a failed batch can contain finished jobs.
+    """
+    destination = Path(destination).resolve()
+    candidates = {}
+
+    def complete(directory):
+        return all((directory / name).is_file() and not (directory / name).is_symlink()
+                   and (directory / name).stat().st_size > 0
+                   for name in ("model.log", "autotune.log"))
+
+    def modified(directory):
+        return (directory / "model.log").stat().st_mtime_ns
+
+    for source in sorted(Path(state).glob("runs/*/results/*")):
+        if not source.is_dir() or source.is_symlink():
+            continue
+        if not complete(source):
+            continue
+        previous = candidates.get(source.name)
+        if previous is None or modified(source) > modified(previous):
+            candidates[source.name] = source
+
+    copied = 0
+    for workload, source in candidates.items():
+        target = destination / workload
+        if source.resolve() == target.resolve():
+            continue
+        if target.is_symlink():
+            raise RuntimeError("collected result must not be a symlink: " + str(target))
+        if complete(target) and modified(target) >= modified(source):
+            continue
+        target.mkdir(parents=True, exist_ok=True)
+        for path in source.iterdir():
+            if path.is_file() and not path.is_symlink():
+                shutil.copy2(path, target / path.name)
+        copied += 1
+    if copied:
+        print(f"[stage2-results] collected {copied} workload(s) into {destination}", flush=True)
+    return copied
+
+
 def sha(path):
     result = hashlib.sha256()
     with Path(path).open("rb") as stream:
@@ -152,6 +197,11 @@ def copy_results(server, slotno):
 
 def main():
     action = sys.argv[1]
+    if action == "collect-results":
+        if len(sys.argv) != 4:
+            raise RuntimeError("usage: local_runtime.py collect-results STATE_ROOT RESULTS_DIR")
+        collect_results(Path(sys.argv[2]), Path(sys.argv[3]))
+        return
     # These CLI helpers run through container SSH and sudo, which discard the
     # manager's environment. The launcher always mounts the selected DB here.
     db = CONTAINER_FPGA_DB

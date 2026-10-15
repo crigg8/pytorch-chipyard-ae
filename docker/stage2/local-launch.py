@@ -14,9 +14,10 @@ import subprocess
 import sys
 from urllib.parse import unquote, urlparse
 
-from local_runtime import agent_socket, device_numbers, selected_device
+from local_runtime import agent_socket, collect_results, device_numbers, selected_device
 
 WORKLOADS = ("smoke-gemm-rvv-4core", "smoke-gemm-gemmini-4core", "smoke-gemm-scalar-16core")
+PROJECT = Path(__file__).resolve().parents[2]
 
 
 def prepare_hwdb(source, destination):
@@ -76,7 +77,7 @@ def main():
     selection.add_argument("--workload", action="append")
     selection.add_argument("--experiment")
     reuse = parser.add_mutually_exclusive_group()
-    reuse.add_argument("--resume", action="store_true")
+    reuse.add_argument("--resume", action="store_true", help="skip existing result logs (the default)")
     reuse.add_argument("--rerun-completed", action="store_true")
     parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--print-command", action="store_true", help="prepare and print the launch command; do not run Docker or access devices")
@@ -130,13 +131,23 @@ def main():
     if not re.fullmatch(r"[1-9][0-9]*", jobs):
         parser.error("STAGE2_BUILD_JOBS must be positive")
     run_id = os.environ.get("RUN_ID")
-    if args.resume and not run_id:
-        parser.error("--resume requires RUN_ID")
     run_id = run_id or datetime.datetime.now(datetime.timezone.utc).strftime("local-%Y%m%dT%H%M%SZ-") + str(os.getpid())
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", run_id):
         parser.error("invalid RUN_ID")
     state = Path(os.environ.get("STAGE2_STATE_ROOT", str(home / ".local/share/pytorch-chipyard-stage2-local"))).resolve()
     run = state / "runs" / run_id
+    # Match scripts/env.sh: legacy account settings must not redirect this
+    # checkout's durable logs into a different checkout or disposable state.
+    if (PROJECT / "scripts/env.sh").is_file():
+        results = Path(os.environ.get("PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR",
+                                     str(PROJECT / "scripts/figures/results-workload"))).resolve()
+        if PROJECT not in results.parents:
+            results = PROJECT / "scripts/figures/results-workload"
+    else:
+        # The administrator-installed smoke bundle has no project checkout.
+        results = state / "results"
+    if "," in str(results):
+        parser.error("result bind mount path contains a comma: " + str(results))
     if not re.fullmatch(r"/[A-Za-z0-9_./+-]+", str(run)):
         parser.error("run path contains unsupported FireSim shell characters")
     docker_env = dict(os.environ)
@@ -166,11 +177,12 @@ def main():
         require_no_host_simulation()
         device_numbers(db)
     if run.exists():
-        if run.is_symlink() or not (args.resume or args.rerun_completed) or not (run / "run.json").is_file():
-            parser.error("RUN_ID already exists; use a new ID or --resume with its run.json")
-    elif args.resume:
-        parser.error("cannot resume a missing run")
+        if run.is_symlink() or not (run / "run.json").is_file():
+            parser.error("RUN_ID already exists without run.json; use a new ID")
     run.mkdir(parents=True, exist_ok=True)
+    if not args.print_command:
+        results.mkdir(parents=True, exist_ok=True)
+        collect_results(state, results)
     for path in (state, state / "runs", run):
         if os.geteuid() == 0:
             os.chown(path, uid, gid)
@@ -190,6 +202,7 @@ def main():
 
     mount(artifact, "/opt/pytorch-chipyard/examples")
     mount(run, run, readonly=False)
+    mount(results, results, readonly=False)
     mount(db, "/run/stage2/fpga-db.json")
     mount("/sys", "/sys")
     mount(agent, "/run/stage2/program-agent.sock")
@@ -224,7 +237,7 @@ def main():
         mount(prepared, "/run/stage2/config_hwdb.yaml")
         environment("FIRESIM_HWDB_PATH", "/run/stage2/config_hwdb.yaml")
     for key, value in {
-        "STAGE2_RUN_DIR": run, "STAGE2_HOST_LOCKED": 1,
+        "STAGE2_RUN_DIR": run, "STAGE2_RESULTS_DIR": results, "STAGE2_HOST_LOCKED": 1,
         "STAGE2_HOST_MACHINE_ID": Path("/etc/machine-id").read_text().strip(),
         "STAGE2_IMAGE_ID": image_id, "STAGE2_BUILD_JOBS": jobs,
         "STAGE2_OUTPUT_UID": uid, "STAGE2_OUTPUT_GID": gid,
@@ -245,12 +258,14 @@ def main():
         command.extend("--workload=" + name for name in args.workload)
     elif args.experiment:
         command.append("--experiment=" + args.experiment)
-    for key in ("resume", "rerun_completed", "preflight_only"):
+    # Completion filtering is already the workflow default. Do not forward the
+    # old --resume flag, which skipped packaging in earlier container images.
+    for key in ("rerun_completed", "preflight_only"):
         if getattr(args, key):
             command.append("--" + key.replace("_", "-"))
     command.append("--rvv-panic-retries=" + str(args.rvv_panic_retries))
     print("STAGE2_RUN_ID=" + run_id, flush=True)
-    print("STAGE2_RESULTS_DIR=" + str(run / "results"), flush=True)
+    print("STAGE2_RESULTS_DIR=" + str(results), flush=True)
     (run / "launch-command.json").write_text(json.dumps(command, indent=2) + "\n")
     if args.print_command:
         print("DOCKER_HOST=" + shlex.quote(endpoint) + " " + shlex.join(command))
@@ -266,8 +281,8 @@ def main():
         raise SystemExit(status)
     if args.smoke_test and not args.preflight_only:
         for workload in WORKLOADS:
-            for output in ("uartlog", "model.log", "autotune.log", "output.bin"):
-                path = run / "results" / workload / output
+            for output in ("model.log", "autotune.log"):
+                path = results / workload / output
                 if not path.is_file() or not path.stat().st_size:
                     raise RuntimeError("missing smoke result: " + str(path))
         print("SMOKE_TEST_STATUS=PASS")

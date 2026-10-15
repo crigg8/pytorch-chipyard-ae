@@ -277,8 +277,8 @@ fi
 if [[ -n "${experiment_arg}" ]]; then
   if [[ "${#workload_args[@]}" -gt 0 || "${only_alias_first}" -eq 1 || \
         "${only_alias_first_cnn_off}" -eq 1 || "${only_table4}" -eq 1 || \
-        "${resume_firesim}" -eq 1 || -n "${resume_from_arg}" ]]; then
-    die "--experiment cannot be combined with another workload, resume, or only-selection option"
+        "${rebuild_pending_images}" -eq 1 || -n "${resume_from_arg}" ]]; then
+    die "--experiment cannot be combined with another workload, rebuild/from-resume, or only-selection option"
   fi
 
   case "${experiment_arg}" in

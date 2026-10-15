@@ -237,6 +237,7 @@ class LocalDockerTests(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0)
 
         with tempfile.TemporaryFile() as lock, patch.dict(os.environ, env, clear=True), \
+                patch.object(launcher, "PROJECT", self.root), \
                 patch.object(sys, "argv", ["launcher", "--preflight-only"]), \
                 patch.object(launcher.os, "open", return_value=lock.fileno()), \
                 patch.object(launcher, "require_no_host_simulation"), \

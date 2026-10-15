@@ -139,13 +139,11 @@ export STAGE2_DOCKER_HOST=unix:///var/run/docker.sock
 export STAGE2_ARTIFACT_DIR="$PWD/examples"
 export STAGE2_STATE_ROOT="$HOME/.local/share/pytorch-chipyard-stage2-local"
 
-# Choose one experiment per invocation; each new invocation creates a run ID.
-# Simple test: partial Figures 6ab, 8a, 9, 11, 13ac
-bash scripts/run-stage2-docker.sh --experiment=simple
+# Full test
+bash scripts/run-stage2-docker.sh
 
 # Figures 6, 7, 8, and 9, plus Table 5
 bash scripts/run-stage2-docker.sh --experiment=figures-6-7-8-9-table5
-
 bash scripts/run-stage2-docker.sh --experiment=figure-10
 bash scripts/run-stage2-docker.sh --experiment=figure-11
 bash scripts/run-stage2-docker.sh --experiment=figure-13
@@ -161,30 +159,15 @@ RUN_ID=previous-run-id \
 
 A successful execution ends with `STAGE2_STATUS=PASS`. Results and diagnostic
 logs remain under `$STAGE2_STATE_ROOT/runs/<run-id>/`; successfully completed
-workload images are removed. `--preflight-only` checks inputs, tools, SSH,
-and FPGA device access without building guest images or programming the FPGA.
-Table 4 timing and TVM/Verilator are not supported in this image; the plotting
-step continues to use the published Table 4 reference.
-
-The existing host scripts remain available for the legacy workflow. The
-container uses the [validated orchestration snapshot](docker/stage2/workflow/README.md).
+workload images are removed. 
 
 ## 5. Generate the paper outputs
 
 ```bash
 source ~/.bashrc
 cd ~/pytorch-chipyard-ae
-
-# Point at one experiment's results, or a directory merging distinct workloads
-# from the completed experiment runs.
-bash scripts/run-plot.sh --results-dir="$STAGE2_RESULTS_DIR"
+bash scripts/run-plot.sh 
 ```
-
-Set `STAGE2_RESULTS_DIR` to the path printed by the launcher (the printed value
-is not automatically exported into your shell). When combining experiments,
-copy each workload directory into a common result directory, preserving its
-`model.log` and `autotune.log`. For the simple experiment, set
-`PYTORCH_CHIPYARD_SIMPLE_STAGE2=1` when running the plot command.
 
 Generated figures use the semantic filenames referenced by the paper source
 under `scripts/figures/`. The plotting workflow checks every generated plot

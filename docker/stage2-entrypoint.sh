@@ -48,7 +48,7 @@ export FIRESIM_WORKLOAD_DIR="${FIRESIM_DEPLOY_DIR}/workloads"
 export FIRESIM_HWDB_PATH="${FIRESIM_HWDB_PATH:-/opt/stage2-metadata/config_hwdb.yaml}"
 export FIRESIM_BUILD_RECIPES_PATH="${FIRESIM_DIR}/deploy/config_build_recipes.yaml"
 export PYTORCH_CHIPYARD_RESULTS_WORKLOAD_DIR="${FIRESIM_DEPLOY_DIR}/results-workload"
-export PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR="${STAGE2_RUN_DIR}/results"
+export PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR="${STAGE2_RESULTS_DIR:-${STAGE2_RUN_DIR}/results}"
 export PYTORCH_CHIPYARD_LOG_DIR="${STAGE2_RUN_DIR}/logs"
 export PYTORCH_CHIPYARD_FIRESIM_RUNTIME_DIR="${STAGE2_RUN_DIR}/runtime"
 export FIRESIM_RUNS_DIR="${STAGE2_RUN_DIR}/runfarm"
@@ -78,13 +78,14 @@ export MAKEFLAGS="-j${STAGE2_BUILD_JOBS:-8} BR2_TAR_OPTIONS=--no-same-owner"
 
 if [[ "${STAGE2_EXECUTION:-ssh}" == local ]]; then
   # Early input/identity errors still leave diagnostic files owned by the user.
-  trap 'chown -hR "${STAGE2_OUTPUT_UID:?}:${STAGE2_OUTPUT_GID:?}" -- "${STAGE2_RUN_DIR}" || true' EXIT
+  trap 'chown -hR "${STAGE2_OUTPUT_UID:?}:${STAGE2_OUTPUT_GID:?}" -- "${STAGE2_RUN_DIR}" "${PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR}" || true' EXIT
 fi
 mkdir -p "${FIRESIM_DEPLOY_DIR}" "${FIRESIM_WORKLOAD_DIR}" "${MARSHAL_IMAGE_DIR}" \
   "${FIREMARSHAL_IMAGE_DIR}" "${PYTORCH_CHIPYARD_WORKLOAD_DIR}" "${TMPDIR}" \
   "${MARSHAL_MOUNT_DIR}" "${LIBGUESTFS_CACHEDIR}" "${MARSHAL_LOG_DIR}" \
   "${MARSHAL_RES_DIR}" "${PYTORCH_CHIPYARD_LOG_DIR}" \
-  "${PYTORCH_CHIPYARD_FIRESIM_RUNTIME_DIR}" "${FIRESIM_RUNS_DIR}"
+  "${PYTORCH_CHIPYARD_FIRESIM_RUNTIME_DIR}" "${FIRESIM_RUNS_DIR}" \
+  "${PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR}"
 
 # Marshal's user config overrides the copied server-specific configuration.
 cat >"${FIREMARSHAL_CONFIG_PATH}" <<EOF
@@ -127,7 +128,7 @@ finish() {
   trap - EXIT
   "${python}" /opt/stage2-support/runtime.py finish "${status}" || true
   if [[ "${STAGE2_EXECUTION:-ssh}" == local ]]; then
-    chown -hR "${STAGE2_OUTPUT_UID:?}:${STAGE2_OUTPUT_GID:?}" -- "${STAGE2_RUN_DIR}" || true
+    chown -hR "${STAGE2_OUTPUT_UID:?}:${STAGE2_OUTPUT_GID:?}" -- "${STAGE2_RUN_DIR}" "${PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR}" || true
   fi
   exit "${status}"
 }

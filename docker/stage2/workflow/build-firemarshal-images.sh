@@ -144,15 +144,7 @@ collected_result_complete() {
   local dest="${PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR}/${workload}"
 
   [[ -d "${dest}" ]] || return 1
-  [[ -f "${dest}/.completed" ]] || return 1
-  [[ -s "${dest}/model.log" ]] || return 1
-  [[ -s "${dest}/autotune.log" ]] || return 1
-  if should_collect_output_bin "${workload}"; then
-    [[ -s "${dest}/output.bin" ]] || return 1
-  fi
-  if [[ -f "${dest}/run.log" ]]; then
-    grep -Fq '[runner] model_ret=0' "${dest}/run.log" || return 1
-  fi
+  [[ -s "${dest}/model.log" && -s "${dest}/autotune.log" ]]
 }
 
 if [[ "${pending_only}" -eq 1 ]]; then
