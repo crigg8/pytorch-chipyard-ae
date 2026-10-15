@@ -119,19 +119,7 @@ A successful run prints `STAGE1_STATUS=PASS`.
 
 ## 4. Run Stage 2 in Docker
 
-First link the Stage 1 outputs using GCC 12.2.0 included in the Stage 1 image. For `--experiment=simple`, prepare its reduced
-Figure 11 input [before linking](docs/stage2-docker.md#simple-experiment-inputs).
-
-```bash
-bash scripts/prepare-stage2-inputs.sh
-```
-
-Stage 2 mounts those inputs read-only, builds FireMarshal images, runs
-FireSim Manager and the native simulation driver inside the container, and
-collects results into a separate run directory. Only FPGA programming goes
-over SSH to host Vivado; the host XDMA module remains loaded.
-
-Use system Docker and the SSH/Vivado settings from the smoke test.
+Stage 2 process FPGA simulation with executable generated from Stage 1.
 
 ```bash
 export STAGE2_DOCKER_SUDO=1

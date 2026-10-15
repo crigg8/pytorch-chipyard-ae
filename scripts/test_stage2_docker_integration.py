@@ -100,6 +100,63 @@ else:
         self.assertIn("/opt/riscv-gcc-12.2.0/riscv-tools/bin/riscv64-unknown-linux-gnu-g++", record["stdin"])
         self.assertIn("--chipyard-env=/opt/riscv-gcc-12.2.0/env.sh", record["stdin"])
 
+    def test_stage1_links_workloads_before_reporting_success(self):
+        project = self.root / "project"
+        scripts = project / "scripts"
+        scripts.mkdir(parents=True)
+        toolchain = self.root / "toolchain"
+        compiler = toolchain / "riscv-tools/bin/riscv64-unknown-linux-gnu-g++"
+        compiler.parent.mkdir(parents=True)
+        compiler.write_text('#!/bin/bash\nprintf "%s\\n" "${GCC_VERSION:-12.2.0}"\n')
+        compiler.chmod(0o755)
+        source = (REPO / "scripts/run-stage1.sh").read_text()
+        (scripts / "run-stage1.sh").write_text(source.replace("/opt/riscv-gcc-12.2.0", str(toolchain)))
+        # Execute the real orchestration, replacing expensive compilation and
+        # linking with a recorder that can also fail at the linker boundary.
+        for name in ("run-cnn.sh", "run-alias-first-cnn.sh", "run-alias-first-sdpa.sh",
+                     "run-im2col.sh", "run-sdpa.sh", "run-flex-attn.sh",
+                     "run_gemmini_autotune.sh", "run_table4.sh", "build-chipyard-elves.sh"):
+            (scripts / name).write_text('''
+set -euo pipefail
+printf '%s %s\\n' "${0##*/}" "$*" >> "$STAGE1_RECORD"
+for arg in "$@"; do
+  case "$arg" in --output-dir=*) mkdir -p "${arg#*=}";; esac
+done
+if [[ "${0##*/}" == build-chipyard-elves.sh ]]; then
+  exit "${LINK_STATUS:-0}"
+fi
+''')
+        skip_all = ["--skip-cnn", "--skip-alias-first", "--skip-im2col", "--skip-sdpa",
+                    "--skip-flex-attn", "--skip-gemmini-autotune", "--skip-table4"]
+        cases = (
+            ("full", [], {}, True, 0),
+            ("simple", [], {"PYTORCH_CHIPYARD_SIMPLE_STAGE2": "1"}, True, 0),
+            ("alias", ["--only-alias-first"], {}, True, 0),
+            ("cnn-alias", ["--only-alias-first-cnn-off"], {}, True, 0),
+            ("table4", ["--only-table4"], {}, False, 0),
+            ("skip-all", skip_all, {}, False, 0),
+            ("link-failure", ["--skip-table4"], {"LINK_STATUS": "23"}, True, 23),
+            ("wrong-compiler", ["--skip-table4"], {"GCC_VERSION": "11.4.0"}, False, 1),
+        )
+        for name, args, overrides, links, status in cases:
+            with self.subTest(case=name):
+                record = self.root / (name + ".txt")
+                env = dict(os.environ, STAGE1_RECORD=str(record), LINK_STATUS="0",
+                           GCC_VERSION="12.2.0", PYTORCH_CHIPYARD_SIMPLE_STAGE2="0",
+                           TABLE4_RESULTS_ROOT=str(project / "results/table4"))
+                env.update(overrides)
+                result = subprocess.run(["bash", str(scripts / "run-stage1.sh"), *args],
+                                        env=env, text=True, capture_output=True)
+                self.assertEqual(result.returncode, status, result.stdout + result.stderr)
+                self.assertEqual("STAGE1_STATUS=PASS" in result.stdout, status == 0)
+                calls = record.read_text().splitlines() if record.exists() else []
+                link_calls = [line for line in calls if line.startswith("build-chipyard-elves.sh ")]
+                self.assertEqual(len(link_calls), int(links), calls)
+                if links:
+                    self.assertEqual(calls[-1], link_calls[0])
+                    self.assertIn("--chipyard-env=" + str(toolchain / "env.sh"), link_calls[0])
+                    self.assertIn("--riscv-gxx=" + str(compiler), link_calls[0])
+
     def test_stage1_smoke_requires_all_linked_elfs_before_reporting_success(self):
         project = self.root / "project"
         scripts = project / "scripts"

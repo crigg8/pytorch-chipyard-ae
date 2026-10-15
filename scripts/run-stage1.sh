@@ -18,7 +18,8 @@ usage() {
 Usage:
   bash scripts/run-stage1.sh [options]
 
-Run the Stage 1 compiler workflow and write artifacts under examples/.
+Compile and link the Stage 1 workloads using the bundled GCC 12.2.0.
+Write artifacts and model-<N>core.elf files for Stage 2 under examples/.
 
 Options:
   --skip-cnn                Skip default CNN workloads.
@@ -268,6 +269,19 @@ if [[ "${skip_table4}" -eq 0 ]]; then
   ln -sfn "${table4_run_id}" "${table4_results_root}/stage1-latest"
   printf '[stage1][PASS] Table 4 compile results=%s\n' "${table4_output_dir}"
   printf '[stage1] TABLE4_STAGE1_LATEST=%s\n' "${table4_results_root}/stage1-latest"
+fi
+
+if [[ "${skip_cnn}" -eq 0 || "${skip_alias_first}" -eq 0 || \
+      "${skip_im2col}" -eq 0 || "${skip_sdpa}" -eq 0 || \
+      "${skip_flex_attn}" -eq 0 || "${skip_gemmini_autotune}" -eq 0 ]]; then
+  compiler=/opt/riscv-gcc-12.2.0/riscv-tools/bin/riscv64-unknown-linux-gnu-g++
+  [[ -x "${compiler}" && "$("${compiler}" -dumpfullversion)" == 12.2.0 ]] || \
+    die "rebuild the Stage 1 image to include RISC-V GCC 12.2.0"
+  log "linking Stage 2 workload ELFs with GCC 12.2.0"
+  bash "${SCRIPT_DIR}/build-chipyard-elves.sh" \
+    --chipyard-env=/opt/riscv-gcc-12.2.0/env.sh \
+    --riscv-gxx="${compiler}"
+  printf '[stage1][PASS] linked workload ELFs=%s\n' "${REPO_ROOT}/examples"
 fi
 
 log "done; artifacts are under ${REPO_ROOT}/examples and ${REPO_ROOT}/results"

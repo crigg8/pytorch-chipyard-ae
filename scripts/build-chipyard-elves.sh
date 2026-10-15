@@ -5,11 +5,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -
 PC_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd -P)"
 
 pc_log() {
-  printf '[artifact-stage2] %s\n' "$*"
+  printf '[artifact-stage1] %s\n' "$*"
 }
 
 pc_die() {
-  printf '[artifact-stage2][error] %s\n' "$*" >&2
+  printf '[artifact-stage1][error] %s\n' "$*" >&2
   exit 1
 }
 
@@ -317,7 +317,7 @@ pc_remove_artifact_kernel_objects() {
   pc_log "${artifact_dir}: removed ${object_count} kernel .obj files after ELF build"
 }
 
-pc_prepare_stage2_environment() {
+pc_prepare_link_environment() {
   set +u
   source "${SCRIPT_DIR}/env.sh"
   set -u
@@ -330,8 +330,8 @@ usage() {
 Usage:
   bash scripts/build-chipyard-elves.sh [options]
 
-Build model-<N>core.elf files from compiler artifacts on a local Chipyard host.
-This script is intended to run outside the compiler-only Docker container.
+Build model-<N>core.elf files from compiler artifacts for Stage 2.
+scripts/run-stage1.sh runs this inside the Stage 1 image with GCC 12.2.0.
 
 Options:
   --artifact-dir=PATH   Build one artifact directory. May be passed multiple times.
@@ -439,7 +439,7 @@ if [[ -n "${riscv_gxx_arg}" ]]; then
   export PYTORCH_CHIPYARD_RISCV_GXX="${riscv_gxx_arg}"
 fi
 
-pc_prepare_stage2_environment
+pc_prepare_link_environment
 
 pc_abs_dir() {
   local path="$1"
