@@ -236,11 +236,9 @@ class LocalDockerTests(unittest.TestCase):
                 handlers[signal.SIGTERM](signal.SIGTERM, None)
             return subprocess.CompletedProcess(command, 0)
 
-        with tempfile.TemporaryFile() as lock, patch.dict(os.environ, env, clear=True), \
+        with patch.dict(os.environ, env, clear=True), \
                 patch.object(launcher, "PROJECT", self.root), \
                 patch.object(sys, "argv", ["launcher", "--preflight-only"]), \
-                patch.object(launcher.os, "open", return_value=lock.fileno()), \
-                patch.object(launcher, "require_no_host_simulation"), \
                 patch.object(launcher, "device_numbers"), \
                 patch.object(launcher.signal, "signal", side_effect=lambda sig, fn: handlers.update({sig: fn})), \
                 patch.object(launcher.subprocess, "check_output", side_effect=['[]', json.dumps(metadata)]) as check, \

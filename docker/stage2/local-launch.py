@@ -2,7 +2,6 @@
 """Launch the full FireSim userspace on the local system Docker engine."""
 import argparse
 import datetime
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -52,22 +51,6 @@ def prepare_hwdb(source, destination):
             raise ValueError("custom_runtime_config is not yet supported by the local launcher")
     destination.write_text(yaml.safe_dump(entries, sort_keys=False))
     return [(str(path), target) for path, target in mounts.items()]
-
-
-def require_no_host_simulation(proc=Path("/proc")):
-    for directory in proc.iterdir():
-        if not directory.name.isdecimal():
-            continue
-        try:
-            name = (directory / "comm").read_text().strip()
-            args = (directory / "cmdline").read_bytes().split(b"\0")
-        except (FileNotFoundError, ProcessLookupError):
-            continue
-        manager = any(Path(os.fsdecode(arg)).name == "firesim" for arg in args[:3] if arg)
-        programming = any(Path(os.fsdecode(arg)).name in ("firesim-fpga-util.py", "vivado", "vivado_lab")
-                          for arg in args[:4] if arg)
-        if name.startswith("FireSim-") or manager or programming:
-            raise RuntimeError("another FireSim/FPGA programming process is active (PID " + directory.name + ")")
 
 
 def main():
@@ -161,7 +144,8 @@ def main():
               if os.environ.get("STAGE2_DOCKER_SUDO") == "1" else ["docker"])
     image = os.environ.get("STAGE2_IMAGE", "pytorch-chipyard:stage2")
     image_id = "<resolved-at-launch>"
-    lock_fd = None
+    # No host-wide lock: runs on different cards may overlap. Each account must
+    # use its own FIRESIM_DB card; the launcher does not detect a shared card.
     if not args.print_command:
         security = subprocess.check_output(docker + ["info", "--format", "{{json .SecurityOptions}}"], env=docker_env, text=True)
         if "name=rootless" in security:
@@ -172,9 +156,6 @@ def main():
         if metadata["Config"]["Labels"].get("org.pytorch-chipyard.stage2.programmer") != "host-vivado-ssh-v1":
             parser.error("build/load the Stage2 image with host Vivado programming")
         image_id = metadata["Id"]
-        lock_fd = os.open("/var/lock/firesim-stage2.lock", os.O_RDWR | os.O_NOFOLLOW)
-        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        require_no_host_simulation()
         device_numbers(db)
     if run.exists():
         if run.is_symlink() or not (run / "run.json").is_file():

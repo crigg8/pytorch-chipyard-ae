@@ -99,16 +99,11 @@ An administrator prepares these once on the physical execution host:
 - An SSH server reachable from Docker, public host keys readable in `/etc/ssh`,
   and an agent key that logs into the same physical host as the chosen account.
   The host identity and selected FPGA are checked before programming.
-- A shared execution lock at `/var/lock/firesim-stage2.lock`, owned by
-  `root:firesim` with mode `0660`. Prepare it once, with no active FPGA job:
+- One FPGA database per concurrent user. Runs on different cards may execute at
+  the same time; the launcher does not detect two runs selecting the same card,
+  so give each account its own `FIRESIM_DB`.
 
-```bash
-sudo touch /var/lock/firesim-stage2.lock
-sudo chown root:firesim /var/lock/firesim-stage2.lock
-sudo chmod 0660 /var/lock/firesim-stage2.lock
-```
-
-The launcher refuses concurrent FireSim/programming processes. It uses system
+The launcher uses system
 Docker with `--userns=host`, device cgroup permission, and device-node creation
 capability; it does not use `--privileged`, a Docker socket mount, host home
 mounts, or a host Vivado mount. Full-experiment invocation still requires
